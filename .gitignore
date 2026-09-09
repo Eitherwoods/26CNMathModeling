@@ -15,9 +15,38 @@
 *.vrb
 *.dvi
 
-# 编辑器备份文件
+# 编辑器与 IDE 备份/临时文件
 *.bak
 *.swp
+*.tmp
+*.swo
+*~
+.vscode/
+.idea/
+*.code-workspace
+
+# 交付物与成果文档（防止 docx/pdf 等成品误入仓库）
+*.docx
+*.doc
+*.pdf
+*.pptx
+*.odt
+deliverables/
+
+# AI 工具痕迹（opencode / WorkBuddy / TRAE / Codex 等）
+.opencode/
+.workbuddy/
+.trae/
+.claude/
+.agents/
+.aider*
+.cursor/
+.codex/
+
+# Python 运行缓存
+__pycache__/
+*.pyc
+*.pyo
 
 # 项目中间文件 理论上不用再写但是我们还是多写一遍
 body/main.log
@@ -41,20 +70,4 @@ body/Thesis.blg
 body/Thesis.bbl
 body/Thesis.synctex(busy)
 
-codes/__pycache__/
-codes/problem1/__pycache__/
-codes/problem2/__pycache__/
-codes/problem3/__pycache__/
-codes/problem12/__pycache__/
-codes/result1.xlsx
-codes/result2.xlsx
-codes/result3.xlsx
-codes\.trae
-codes/result3_method1.xlsx
-codes/result3_method2.xlsx
-codes/result3_method3.xlsx
-codes\__pycache__
-.trae/
-.workbuddy/
 logs/
-deliverables/
