@@ -1,0 +1,164 @@
+% !TEX program = xelatex
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath}
+\usepackage{geometry}
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+\usepackage{titlesec}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE\bfseries 基于嵌套联合优化与射线追踪的FAST主动反射面调节模型}\\[1em]
+    {\large AI工具使用说明}
+\end{center}
+
+\vspace{1em}
+
+本作品在研究与撰写过程中使用了AI工具辅助完成部分建模思路讨论、代码实现、数值实验与论文修订工作。以下详细说明所用AI工具的名称、使用目的、关键交互内容及人工修改情况。
+
+% ============================================================
+\section{所用AI工具信息}
+
+\begin{enumerate}
+    \item \textbf{DeepSeek网页端}（\url{https://chat.deepseek.com}）
+    \begin{itemize}
+        \item 模型版本：DeepSeek-V4-Flash、DeepSeek-V4-Pro
+        \item 使用时间：2026年8月26日--8月29日
+        \item 用途：赛题理解与建模思路的头脑风暴、几何推导与优化建模思路的校验、论文段落的中文表达润色
+    \end{itemize}
+
+    \item \textbf{WorkBuddy}（AI编程助手）
+    \begin{itemize}
+        \item 使用时间：2026年8月26日--8月29日
+        \item 用途：Python求解代码的编写与调试（几何计算、嵌套优化求解、射线追踪与结果输出），数值实验脚本编写，论文修订与LaTeX编译排错辅助
+    \end{itemize}
+
+    \item \textbf{TRAE}（字节跳动AI编程助手）
+    \begin{itemize}
+        \item 使用时间：2026年8月26日--8月29日
+        \item 用途：代码重构与公共模块的抽取，数值实验脚本的批量生成
+    \end{itemize}
+
+    \item \textbf{Codex}（OpenAI代码生成模型）
+    \begin{itemize}
+        \item 使用时间：2026年8月26日--8月29日
+        \item 用途：辅助编写数据处理与结果校核脚本
+    \end{itemize}
+\end{enumerate}
+
+% ============================================================
+\section{具体使用目的与环节}
+
+\begin{table}[H]
+\centering
+\caption{AI工具使用情况总览}
+\label{tab:ai-usage}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|p{5.6cm}|p{4.4cm}|c|}
+\hline
+\textbf{序号} & \textbf{使用目的} & \textbf{对应环节} & \textbf{工具} \\
+\hline
+1 & 调节约束下理想抛物面确定思路讨论 & 问题一/二模型建立 & DeepSeek \\
+\hline
+2 & 径向求交与面板球心反演推导的思路校验 & 几何底座 & DeepSeek \\
+\hline
+3 & 罚函数法、坐标下降等内层求解策略讨论 & 嵌套联合优化 & DeepSeek \\
+\hline
+4 & 几何计算、优化求解与射线追踪核心代码实现 & 全题代码实现 & WorkBuddy \\
+\hline
+5 & 代码重构与公共模块（common.py）抽取 & 工程组织 & TRAE \\
+\hline
+6 & 求解器对照、焦距扫描与敏感性实验脚本 & 实验验证 & TRAE/WorkBuddy \\
+\hline
+7 & 数据预处理与result.xlsx校核脚本 & 结果校验 & Codex \\
+\hline
+8 & 论文修订、图表排版与编译排错 & 论文撰写 & WorkBuddy \\
+\hline
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section{关键交互记录}
+
+本作品的交互记录留存于项目工程日志与代码提交历史中，主要内容归纳如下。
+
+\subsection{理想交点解的可行性评估与模型结构}
+
+\begin{itemize}
+    \item \textbf{主要咨询内容}：\\
+    将基准球面上的主索节点调节为理想抛物面时，促动器只能沿径向伸缩，且相邻索长相对变化不得超过$0.07\%$。直接取节点径向与抛物面交点作为调节目标是否可行？焦距应如何确定？
+
+    \item \textbf{AI回复要点}：
+    \begin{enumerate}
+        \item 建议先数值检验理想交点解是否满足索长约束，再决定模型结构；
+        \item 若不可行，应将焦距$p$与节点伸缩量$\boldsymbol{\delta}$置于同一优化框架内联合确定，可考虑外层对焦距作一维搜索、内层在约束下求最贴近理想目标的可行解的嵌套结构；
+        \item 内层非凸问题可考虑罚函数法与坐标下降法相结合的策略。
+    \end{enumerate}
+
+    \item \textbf{采纳与修改情况}：\\
+    抛物面一般方程、径向求交二次方程与索长余弦定理解析式均由队员独立推导并手工复核。数值实验证实理想交点解的索长最大相对变化为$0.12809\%$，超过$0.07\%$限值，据此确认嵌套结构的必要性；内层最终采用``罚函数解为初值$+$多顺序坐标下降''的混合多起点策略，较单一方法残差改善$22.1\%$，并以$30$随机种子与独立SLSQP求解器作了全局最优性对照。
+\end{itemize}
+
+\subsection{内层求解器对照与全局最优性实验}
+
+\begin{itemize}
+    \item \textbf{主要交互内容}：\\
+    在WorkBuddy辅助下编写内层求解器对照脚本（问题二方向、$p=140.3839\,\mathrm{m}$固定），比较罚函数法、坐标下降法与混合多起点策略；进一步生成$30$个随机种子坐标下降与独立SLSQP求解的对照实验。
+
+    \item \textbf{结果与处理}：
+    \begin{enumerate}
+        \item 罚函数法、坐标下降法与混合多起点的残差分别为$66.81$、$66.13$、$51.53\,\mathrm{mm}$，坐标下降增至$300$轮结果不变，确认其已收敛至自身局部最优；
+        \item $30$随机种子最优$62.72\,\mathrm{mm}$，SLSQP双起点收敛至$50.11\,\mathrm{mm}$，与混合解仅差$1.4\,\mathrm{mm}$，表明混合解接近全局最优；
+        \item 上述对照经队员复核后写入论文正文与附录表。
+    \end{enumerate}
+\end{itemize}
+
+\subsection{三种贴合度量方案的实现与比较}
+
+\begin{itemize}
+    \item \textbf{主要交互内容}：\\
+    围绕``尽量贴近''的度量，在WorkBuddy与TRAE辅助下实现节点、面板中心、整块面板积分三种拟合优度目标，并在焦距网格上对三种方案各自的真实目标函数独立求解比较。
+
+    \item \textbf{结果与处理}：\\
+    三种方案的最优焦距完全一致（$p^{*}=140.3839\,\mathrm{m}$），各指标差异均在$2.5\%$以内；队员据``索长约束是瓶颈''的分析最终选定方案一。全部实验固定随机种子，结果可复现，数据与图表经队员逐项核对后写入论文。
+\end{itemize}
+
+\subsection{论文评阅与数值口径修订}
+
+\begin{itemize}
+    \item \textbf{主要交互内容}：\\
+    在WorkBuddy辅助下对论文稿进行通读评阅，按严重程度分级给出修改意见，并逐项落实：删除遗留的调试输出命令，统一接收比（$0.3407$）、节点残差（$51.5\,\mathrm{mm}$）等数值在摘要、正文与图表间的口径，为焦距扫描表与正式结果间的微小差异补充来源说明。
+
+    \item \textbf{采纳与修改情况}：\\
+    全部修改意见经队员逐条确认后才予采纳；修订后重新编译并核对，编译零错误，交叉引用全部解析。
+\end{itemize}
+
+% ============================================================
+\section{人工修改与质量保证}
+
+\begin{enumerate}
+    \item \textbf{模型层面}：全部几何推导（抛物面一般方程、径向求交、面板球心反演、矢量反射定律）与优化模型（嵌套结构、行程与索长约束的形式化）由队员独立完成并手工推演复核；AI工具的讨论输出仅用作思路参考与逻辑校验，未直接采信。
+
+    \item \textbf{代码层面}：全部Python求解代码由队员在本机调试修正，公共模块经队员重构整理；关键算法的正确性以自洽检验把关——理想抛物面接收比严格为$1.000000$，基准态面板球心反演残差小于$0.02\,\mathrm{m}$（源于附件坐标的舍入）。
+
+    \item \textbf{结果层面}：所有数值结果由队员在本机运行项目代码得到；提交的\texttt{result.xlsx}通过七项独立校核（行列对应、行程限幅、由伸缩量反算坐标、逐边复核索长变化等）；接收比计算通过采样收敛性（$m=10\to30$，波动不足$0.6\%$）与口径覆盖率（$99.98\%$）检验。
+
+    \item \textbf{论文层面}：论文正文的建模逻辑、结论表述与工程判断由队员撰写并经全队讨论定稿；AI辅助修订的文字与排版均经队员逐段核对，未直接采用任何未经检验的内容。
+\end{enumerate}
+
+\vspace{1em}
+\noindent\textbf{声明}：本团队对论文中所有内容的真实性、准确性和原创性负责。AI工具的使用仅限于辅助建模思路讨论、代码实现、实验组织与排版修订；核心模型构建、公式推导、求解策略设计与论文定稿均由团队成员独立完成。
+
+\end{document}
