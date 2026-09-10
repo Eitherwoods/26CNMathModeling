@@ -1,7 +1,7 @@
 # B题通信层与离线桩
 
 依据用户指定的 `CUMCM2026Problems/B题/附件/附件1.docx`、`附件2.docx`。
-实现HTTP协议封装、离线响应与状态机验证，并提供后续问题3/4算法接入入口。
+实现问题一、二几何求解，以及 HTTP 协议封装、离线响应与状态机验证，并提供后续问题3/4算法接入入口。
 Python 3.9+，无第三方依赖。
 
 ## 运行
@@ -11,6 +11,8 @@ Python 3.9+，无第三方依赖。
 ```powershell
 python -m codes.run_robot
 python -m unittest codes.test_protocol -v
+python -m codes.problem2_solution --station 0 0 --bearing 0
+python -m unittest codes.test_problem2 -v
 ```
 
 演示使用内存桩，无网络连接；默认将请求和响应追加至
@@ -20,6 +22,8 @@ python -m unittest codes.test_protocol -v
 
 ## 文件职责
 
+- `problem2_solution.py`：问题二的保守离散化候选区域与第二检测点求解器。
+- `test_problem2.py`：问题二角度、近距离、可靠性裕量与端到端验证。
 - `protocol.py`：`RobotClient`、`RobotState`、显式开启的 `HttpTransport`。
 - `offline_stub.py`：串行、幂等缓存、计时、人工配置干扰源的确定性响应。
 - `run_robot.py`：默认离线；支持用户手动启动的演练，无正式模式选项。
@@ -27,6 +31,18 @@ python -m unittest codes.test_protocol -v
 - `strategy.py`：算法加载、上下文、会话开始与正常结束。
 - `strategy_demo.py`：附件的通信计时示例，不是问题3/4求解算法。
 - `test_protocol.py`：计时、丢包、拒绝、超时、输入边界和HTTP传输检查。
+
+## 问题二运行
+
+问题二不依赖模拟器。以第一次检测点 $(x_1,y_1)$ 和示向度 $\theta_1$ 为输入：
+
+```powershell
+python -m codes.problem2_solution --station 0 0 --bearing 0
+```
+
+结果写入 `output/Problem2/problem2_results.json`，候选区域图写入
+`figures/Problem2/problem2_candidates.png` 与 `.svg`。程序按离散覆盖裕量收紧可靠条件；
+更改网格步长后应重新运行，并同时检查输出中的 `coverage_margin_m`。
 
 ## 代码接入
 
