@@ -1,0 +1,22 @@
+{"wall_time_ns":1789042988331200000,"event":"request","path":"/enter","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"d152cc3884d547dfa0e393eca1b012ab\"}","attempt":1}
+{"wall_time_ns":1789042988333840300,"event":"network_error","error":"[WinError 10054] 远程主机强迫关闭了一个现有的连接。","path":"/enter","attempt":1}
+{"wall_time_ns":1789042988440088200,"event":"request","path":"/enter","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"d152cc3884d547dfa0e393eca1b012ab\"}","attempt":2}
+{"wall_time_ns":1789042988456172900,"event":"network_error","error":"<urlopen error [WinError 10053] 你的主机中的软件中止了一个已建立的连接。>","path":"/enter","attempt":2}
+{"wall_time_ns":1789042988657684300,"event":"request","path":"/enter","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"d152cc3884d547dfa0e393eca1b012ab\"}","attempt":3}
+{"wall_time_ns":1789042988673064500,"event":"network_error","error":"<urlopen error [WinError 10053] 你的主机中的软件中止了一个已建立的连接。>","path":"/enter","attempt":3}
+{"wall_time_ns":1789043058074950600,"event":"request","path":"/enter","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"26c7360a746e4fc0a3b287ff66a93b1e\"}","attempt":1}
+{"wall_time_ns":1789043058077997500,"event":"network_error","error":"[WinError 10054] 远程主机强迫关闭了一个现有的连接。","path":"/enter","attempt":1}
+{"wall_time_ns":1789043058189460300,"event":"request","path":"/enter","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"26c7360a746e4fc0a3b287ff66a93b1e\"}","attempt":2}
+{"wall_time_ns":1789043058190428500,"event":"network_error","error":"[WinError 10054] 远程主机强迫关闭了一个现有的连接。","path":"/enter","attempt":2}
+{"wall_time_ns":1789043058392978800,"event":"request","path":"/enter","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"26c7360a746e4fc0a3b287ff66a93b1e\"}","attempt":3}
+{"wall_time_ns":1789043058409088700,"event":"response","path":"/enter","status":200,"raw_utf8":"{\"accepted\":true,\"real_timestamp_ms\":1789043058059,\"virtual_time_s\":0,\"max_virtual_duration_s\":360000,\"max_real_duration_s\":1200,\"remaining_real_duration_s\":1200}\n"}
+{"wall_time_ns":1789043058409088700,"event":"request","path":"/measure","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"10be3a7b2850439f8ad3faf720f57503\",\"position\":{\"x\":300,\"y\":400},\"channel\":1}","attempt":1}
+{"wall_time_ns":1789043058423989000,"event":"response","path":"/measure","status":200,"raw_utf8":"{\"accepted\":true,\"real_timestamp_ms\":1789043058074,\"virtual_time_s\":105,\"measure_result\":\"no_signal\"}\n"}
+{"wall_time_ns":1789043058423989000,"event":"request","path":"/measure","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"b99d469258914e44aec87b509bbd1f3c\",\"position\":{\"x\":300,\"y\":400},\"channel\":2}","attempt":1}
+{"wall_time_ns":1789043058439615300,"event":"response","path":"/measure","status":200,"raw_utf8":"{\"accepted\":true,\"real_timestamp_ms\":1789043058090,\"virtual_time_s\":111,\"measure_result\":\"no_signal\"}\n"}
+{"wall_time_ns":1789043058440143600,"event":"request","path":"/clear","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"d19c7cd7a2ab41948eedcc7301728b24\",\"position\":{\"x\":300,\"y\":0},\"channel\":3}","attempt":1}
+{"wall_time_ns":1789043058454877700,"event":"response","path":"/clear","status":200,"raw_utf8":"{\"accepted\":true,\"real_timestamp_ms\":1789043058105,\"virtual_time_s\":194,\"clear_result\":\"no_target_in_range\"}\n"}
+{"wall_time_ns":1789043058454877700,"event":"request","path":"/measure","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"d24a45a2549f4926b1fd03b9cd97be11\",\"position\":{\"x\":300,\"y\":0},\"channel\":2}","attempt":1}
+{"wall_time_ns":1789043058470610500,"event":"response","path":"/measure","status":200,"raw_utf8":"{\"accepted\":true,\"real_timestamp_ms\":1789043058121,\"virtual_time_s\":199,\"measure_result\":\"no_signal\"}\n"}
+{"wall_time_ns":1789043058471130100,"event":"request","path":"/exit","body_utf8":"{\"arena_id\":\"default\",\"robot_id\":\"202610009100\",\"request_id\":\"0827e57026b8452585c1dfb399b8fe04\"}","attempt":1}
+{"wall_time_ns":1789043058486206700,"event":"response","path":"/exit","status":200,"raw_utf8":"{\"accepted\":true,\"real_timestamp_ms\":1789043058136,\"virtual_time_s\":199,\"exit_reason\":\"user_exit\"}\n"}
