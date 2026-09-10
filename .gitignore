@@ -26,9 +26,7 @@
 *.code-workspace
 
 # 交付物与成果文档（防止 docx/pdf 等成品误入仓库）
-*.docx
 *.doc
-*.pdf
 *.pptx
 *.odt
 deliverables/
@@ -42,6 +40,7 @@ deliverables/
 .aider*
 .cursor/
 .codex/
+.mimocode/
 
 # Python 运行缓存
 __pycache__/
