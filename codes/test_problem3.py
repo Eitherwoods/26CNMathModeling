@@ -4,10 +4,15 @@
 本文件只使用本地桩（`OfflineStub`），不连接官方模拟器。
 按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
 """
+import json
+from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 
+from . import config as settings
 from .base_models import distance_to_wedge, min_enclosing_circle, sampled_diameter
 from .config import (CHANNEL_COUNT, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
                      MIN_RECEIVE_RADIUS_M, NEAR_DISTANCE_M, ROBOT_SPEED_MPS,
@@ -18,10 +23,10 @@ from .problem3_model import (ChannelKnowledge, Lattice, apply_direction,
                              coverage_radius_m, hex_waypoints,
                              sweep_waypoint_gain, wedge_distance)
 from .problem3_solution import (Problem3Config, Problem3Strategy, StopPlan,
-                                run_mission, summarize)
+                                is_offline_run, run_mission, solve, summarize)
 from .protocol import RobotClient, decode, encode
 from .scenario import fixed_scenario, random_scenario, sweep_waypoints
-from .strategy import run_strategy
+from .strategy import StrategyContext, run_strategy
 
 PROBE = np.array([[300.0, 4.0], [1000.0, 0.0], [300.0, 30.0], [3.0, 0.0],
                   [1600.0, 0.0], [-300.0, 0.0], [0.0, 40.0], [40.0, 0.0],
@@ -494,35 +499,11 @@ class StrategyGuardTests(unittest.TestCase):
 
 
 class NewModelStrategyTests(unittest.TestCase):
-    """新建模落地：全局数量先验、保证性追踪及公平调度。"""
+    """新建模落地：保证性追踪边界及可选公平调度。"""
 
     def setUp(self):
         """构造不连接模拟器的最小问题三策略。"""
         self.strategy = Problem3Strategy(_DummyContext())
-
-    def test_unknown_probability_uses_global_count_bounds(self):
-        """未知频道存在概率应随已确认源数变化，而不是固定除以20。"""
-        probability, lower, upper = self.strategy._unknown_source_probability()
-        self.assertAlmostEqual(probability, 13.0 / 20.0, places=9)
-        self.assertEqual((lower, upper), (10, 16))
-        for channel in range(1, 11):
-            self.strategy.channels[channel].mark_cleared(0.0)
-        probability, lower, upper = self.strategy._unknown_source_probability()
-        self.assertAlmostEqual(probability, 3.0 / 10.0, places=9)
-        self.assertEqual((lower, upper), (0, 6))
-
-    def test_expected_finds_is_channel_specific(self):
-        """期望发现数只统计未发现频道，并按其当前可能区域计算命中比例。"""
-        waypoint = np.array([0.0, 0.0])
-        probability, _, _ = self.strategy._unknown_source_probability()
-        expected = self.strategy._expected_finds([1], waypoint)
-        ratio = (self.strategy._search_gain(1, waypoint)
-                 / self.strategy.channels[1].possible_area_m2)
-        self.assertAlmostEqual(expected, probability * ratio, places=9)
-        self.strategy._apply_measure(
-            1, waypoint,
-            {'measure_result': 'direction', 'svd_deg': 0.0, 'virtual_time_s': 5.0})
-        self.assertEqual(self.strategy._expected_finds([1], waypoint), 0.0)
 
     def test_guaranteed_tracking_contracts_upper_bound(self):
         """保证性追踪点必须按 qU 前进，并把下一轮安全上界收缩为 qU。"""
@@ -557,6 +538,17 @@ class NewModelStrategyTests(unittest.TestCase):
         self.strategy._search_plan = lambda: cheap_search
         self.assertEqual(self.strategy._decide().kind, 'guaranteed_track')
 
+    def test_default_mode_does_not_force_tracking_debt(self):
+        """性能模式默认不让保守追踪债务打断更便宜的搜索动作。"""
+        self.strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.0, 'virtual_time_s': 5.0})
+        self.strategy.tracking_wait_rounds[1] = self.strategy.config.tracking_debt_limit_rounds
+        cheap_search = StopPlan('sweep', np.array([0.0, 0.0]), [2], score_s=0.1)
+        self.strategy._chase_options = lambda: []
+        self.strategy._search_plan = lambda: cheap_search
+        self.assertEqual(self.strategy._decide().kind, 'sweep')
+
 
 class CoverageCertificateTests(unittest.TestCase):
     """不存在性证明的覆盖证书：必须能区分"真覆盖"与"只是掩码空了"。"""
@@ -565,9 +557,9 @@ class CoverageCertificateTests(unittest.TestCase):
         self.strategy = Problem3Strategy(_DummyContext())
 
     def test_candidate_grid_is_coverage_complete(self):
-        """固定候选格网（域内 9 点）必须对任意源位置都能给出读数。
+        """默认九点格网候选必须对任意源位置都能给出读数。
 
-        最坏距离必须不超过有效接收半径下界 1000 m，这是"九点全无信号 ⇒
+        最坏距离必须不超过有效接收半径下界 1000 m，这是"候选点全无信号 ⇒
         该频道不存在"这条严格结论的依据。
         """
         complete, worst, note = self.strategy.verify_coverage_completeness()
@@ -647,6 +639,54 @@ class FollowUpEstimateTests(unittest.TestCase):
         # 中心点的接收圆半径 1000 m，平均距离约 2/3*1000 ≈ 667 m ⇒ 约 133 s。
         self.assertLess(near, MIN_RECEIVE_RADIUS_M / ROBOT_SPEED_MPS)
         self.assertGreater(near, 50.0)
+
+
+class SearchStopFillTests(unittest.TestCase):
+    """搜索停靠点补测：移动一旦确定，应利用已经支付的行程成本。"""
+
+    def setUp(self):
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_selected_stop_includes_positive_gain_below_threshold(self):
+        """低于选点阈值但仍有正增益的频道应在同一停靠点顺手完成。"""
+        waypoint = np.array([0.0, 0.0])
+        self.strategy._candidate_waypoints = lambda: np.asarray([waypoint])
+        self.strategy._active_channels = lambda: [1, 2]
+        self.strategy._station_is_new = lambda channel, point: True
+        self.strategy._search_options = (
+            lambda point, min_gain, cap: [1] if min_gain > 0.0 else [1, 2])
+        self.strategy._search_cap = lambda: CHANNEL_COUNT
+        self.strategy._measure_gain = lambda channels, point: float(len(channels)) * 1.0e6
+        self.strategy._expected_finds = lambda remaining, gain: 1.0
+        self.strategy._follow_up_seconds = lambda point: 0.0
+        plan = self.strategy._best_search_plan(remaining_sources=5, min_gain=1.0e5)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.measures, [1, 2])
+
+
+class RecordPlacementTests(unittest.TestCase):
+    """问题三离线记录必须与官方在线结果严格分目录保存。"""
+
+    def test_offline_solve_writes_record_under_protocol(self):
+        """本地桩运行应写入 protocol，并使用 offline- 文件名前缀。"""
+        record = {
+            'cleared_channels': [], 'start_virtual_time_s': 0.0,
+            'end_virtual_time_s': 0.0, 'real_elapsed_s': 0.0,
+            'stop_reason': 'all_channels_resolved', 'unresolved_channels': [],
+            'inconsistent_channels': [], 'steps': [], 'moved_distance_m': 0.0,
+            'planner_errors': 0,
+        }
+        context = StrategyContext(RobotClient('offline-team', OfflineStub()), 3)
+        self.assertTrue(is_offline_run(context))
+        with tempfile.TemporaryDirectory() as tmp:
+            with (mock.patch('codes.problem3_solution.run_mission', return_value=record),
+                  mock.patch.object(settings, 'PROTOCOL_LOG_DIR', Path(tmp))):
+                summary = solve(context)
+            target = Path(summary['record_path'])
+            self.assertEqual(target.parent, Path(tmp))
+            self.assertTrue(target.name.startswith('offline-mission_p3_'))
+            payload = json.loads(target.read_text(encoding='utf-8'))
+            self.assertEqual(payload['record']['stop_reason'], 'all_channels_resolved')
 
 
 class BackstopSearchTests(unittest.TestCase):
