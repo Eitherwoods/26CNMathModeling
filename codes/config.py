@@ -17,6 +17,11 @@ PROBLEM4_OUTPUT_DIR = ROOT_DIR / 'output' / 'Problem4'
 PROBLEM4_FIG_DIR = ROOT_DIR / 'figures' / 'Problem4'
 PROTOCOL_LOG_DIR = ROOT_DIR / 'output' / 'protocol'
 
+# output/ 目录约定（见 output/README.md）：ProblemN 只放官方模拟器的**在线**结果，
+# 离线自检的协议日志与任务记录一律进 protocol，避免自检数字和演练成绩混在一起。
+ONLINE_RECORD_DIRS = {1: PROBLEM1_OUTPUT_DIR, 2: PROBLEM2_OUTPUT_DIR,
+                      3: PROBLEM3_OUTPUT_DIR, 4: PROBLEM4_OUTPUT_DIR}
+
 # 几何常量（附录1、附录2）
 ANGLE_ERROR_DEG = 1.0
 TARGET_RADIUS_M = 1800.0
@@ -41,6 +46,7 @@ REAL_BUDGET_S = 1200.0
 VIRTUAL_BUDGET_S = 360000.0
 
 # 问题四：以下为待演练的初始参数，不代表已经调优。
+# 优化目标是虚拟时间（机器狗耗时），其中移动约占九成，故调度优先压低行进。
 PROBLEM4_LATTICE_SPACING_M = 20.0
 PROBLEM4_SEARCH_SPACING_M = 900.0
 PROBLEM4_ORIENTATION_BINS = 24
@@ -48,6 +54,7 @@ PROBLEM4_RADIUS_BINS = 4
 PROBLEM4_HYPOTHESIS_LIMIT = 96
 PROBLEM4_SEARCH_INTERVAL = 4
 PROBLEM4_TRACKING_LIMIT = 8
+PROBLEM4_FAIRNESS_AGE_ROUNDS = 96
 PROBLEM4_MAX_ROUNDS = 10000
 PROBLEM4_INFO_THRESHOLD = 0.005
 PROBLEM4_EXIT_RESERVE_S = 15.0
@@ -63,6 +70,20 @@ BACKEND = 'Agg'
 def fmt6(value):
     """以六位小数显示结果；机器可读文件保留原始精度。"""
     return f'{value:.6f}'
+
+
+def record_dir_for(problem, *, offline=False):
+    """任务记录写盘目录：离线自检归 `output/protocol`，在线（演练/正式）归 `output/ProblemN`。
+
+    目录约定见 `output/README.md`。离线桩不复刻官方误差场与判定细节，其数字不是成绩，
+    因此必须与在线结果分开放，避免自检记录被误当演练结果引用。
+    """
+    if offline:
+        return PROTOCOL_LOG_DIR
+    try:
+        return ONLINE_RECORD_DIRS[int(problem)]
+    except (KeyError, TypeError, ValueError):
+        raise ValueError(f'未知题号，无法确定记录目录：{problem!r}') from None
 
 
 def setup_matplotlib(backend=BACKEND):

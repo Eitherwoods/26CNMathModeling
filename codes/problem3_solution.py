@@ -30,7 +30,8 @@ import numpy as np
 
 from .base_models import bearing_deg
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
-                     CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_SOURCE_COUNT,
+                     CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
+                     MAX_SOURCE_COUNT,
                      MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M, PROBLEM3_OUTPUT_DIR,
                      ROBOT_SPEED_MPS, TARGET_RADIUS_M)
 from .problem3_model import ChannelKnowledge, Lattice, apply_direction
@@ -75,6 +76,8 @@ class Problem3Config:
     # 停靠点回访惩罚：抑制收尾阶段在已服务区域之间反复横跳。
     revisit_radius_m: float = 400.0
     revisit_penalty_s: float = 120.0
+    # 保证性示向追踪：若已发现频道长期未被服务，则强制执行一次收缩上界的追踪动作。
+    tracking_debt_limit_rounds: int = 10
 
 
 @dataclass
@@ -88,6 +91,8 @@ class StopPlan:
     score_s: float = float('inf')
     note: str = ''
     expect_finds: float = 0.0
+    target_channel: int | None = None
+    guaranteed_upper_m: float | None = None
 
 
 def summarize(record, true_total=None):
@@ -135,6 +140,10 @@ class Problem3Strategy:
         self.stop_reason = 'running'
         self._started_at = time.monotonic()
         self._reach_cache: dict = {}
+        # channel -> {anchor: (x, y), bearing_deg: theta, upper_m: U}。
+        # 该状态只记录可由示向读数严格保证的追踪上界，不参与细格网可靠结论。
+        self.tracking_states: dict = {}
+        self.tracking_wait_rounds = {channel: 0 for channel in self.channels}
 
     def _build_candidates(self):
         """搜索候选停靠点：只保留**落在目标圆域内**的格点。
@@ -184,6 +193,33 @@ class Problem3Strategy:
         """
         return [channel for channel, knowledge in self.channels.items()
                 if knowledge.is_active and knowledge.observations]
+
+    def _unknown_channels(self):
+        """返回尚未确认存在、也未清除或排除的频道。"""
+        return [channel for channel, knowledge in self.channels.items()
+                if knowledge.status == 'unknown' and knowledge.is_active]
+
+    def _confirmed_source_count(self):
+        """返回已经由有效读数或清除结果确认存在的频道数。"""
+        return sum(knowledge.status in ('detected', 'cleared')
+                   for knowledge in self.channels.values())
+
+    def _unknown_source_probability(self):
+        """由源总数上下界给出未发现频道的共同存在概率估计。
+
+        这是搜索评分使用的显式均匀先验，不参与排除、可靠清除等严格结论。
+        返回值同时包含概率和剩余未知源数的上下界，便于记录与测试。
+        """
+        unknown_count = len(self._unknown_channels())
+        if unknown_count == 0:
+            return 0.0, 0, 0
+        confirmed = self._confirmed_source_count()
+        lower = max(0, 10 - confirmed)
+        upper = min(MAX_SOURCE_COUNT - confirmed, unknown_count)
+        if upper <= 0:
+            return 0.0, lower, upper
+        expected = 0.5 * (lower + upper)
+        return float(np.clip(expected / unknown_count, 0.0, 1.0)), lower, upper
 
     def _reach(self, waypoint):
         """候选停靠点的可检测格点集合（按停靠点缓存）。"""
@@ -268,10 +304,23 @@ class Problem3Strategy:
         options = []
         for limit, channel in detected[:self.config.chase_options_limit]:
             knowledge = self.channels[channel]
+            tracking = self.tracking_states.get(channel)
+            if tracking is not None and tracking['upper_m'] <= CLEAR_RADIUS_M:
+                waypoint = np.asarray(tracking['anchor'], dtype=float)
+                options.append(StopPlan(
+                    'clear', waypoint, [], self._travel_m(waypoint),
+                    self._travel_s(waypoint) + CLEAR_TIME_S,
+                    note=f'频道{channel}保证性追踪上界已进入清除半径',
+                    target_channel=channel))
+                continue
             if limit <= CLEAR_RADIUS_M:
                 options.append(StopPlan('clear', np.array(self.position), [], 0.0, 0.0,
-                                        note=f'频道{channel}已可证清除'))
+                                        note=f'频道{channel}已可证清除',
+                                        target_channel=channel))
                 continue
+            guaranteed = self._guaranteed_tracking_plan(channel, knowledge)
+            if guaranteed is not None:
+                options.append(guaranteed)
             waypoint, note = self._chase_waypoint(channel, knowledge, limit)
             if waypoint is None or not self._station_is_new(channel, waypoint):
                 continue
@@ -285,8 +334,49 @@ class Problem3Strategy:
                 continue
             score = self._clear_expectation_s(channel, waypoint, measures)
             options.append(StopPlan('chase', waypoint, measures, self._travel_m(waypoint),
-                                    score_s=score, note=note))
+                                    score_s=score, note=note, target_channel=channel))
         return options
+
+    @staticmethod
+    def _tracking_ratio():
+        """返回示向误差上界下保证性追踪的距离收缩系数 q。"""
+        return 1.0 / (2.0 * np.cos(np.deg2rad(ANGLE_ERROR_DEG)))
+
+    def _tracking_remaining_s(self, upper_m):
+        """估计从安全距离上界 U 出发完成保证性追踪所需的保守虚拟时间。"""
+        upper_m = max(0.0, float(upper_m))
+        if upper_m <= CLEAR_RADIUS_M:
+            return CLEAR_TIME_S
+        ratio = self._tracking_ratio()
+        steps = int(np.ceil(np.log(CLEAR_RADIUS_M / upper_m) / np.log(ratio)))
+        travel_m = ratio * upper_m * (1.0 - ratio ** steps) / (1.0 - ratio)
+        return travel_m / ROBOT_SPEED_MPS + MEASURE_TIME_S * steps + CLEAR_TIME_S
+
+    def _guaranteed_tracking_plan(self, channel, knowledge):
+        """由最新有效示向构造一次严格收缩距离上界的追踪动作。"""
+        state = self.tracking_states.get(channel)
+        if state is None or state['upper_m'] <= CLEAR_RADIUS_M:
+            return None
+        ratio = self._tracking_ratio()
+        anchor = np.asarray(state['anchor'], dtype=float)
+        bearing_rad = np.deg2rad(state['bearing_deg'])
+        direction = np.array([np.cos(bearing_rad), np.sin(bearing_rad)])
+        waypoint = anchor + ratio * state['upper_m'] * direction
+        if not self._station_is_new(channel, waypoint):
+            return None
+        measures = self._search_options(
+            waypoint, self.config.search_min_gain_m2,
+            self.config.search_channels_per_stop)
+        if channel not in measures:
+            measures.append(channel)
+        measures = self._order_measures(measures)
+        next_upper = ratio * state['upper_m']
+        score = (self._travel_s(waypoint) + self._measure_cost_s(measures)
+                 + self._tracking_remaining_s(next_upper))
+        return StopPlan(
+            'guaranteed_track', waypoint, measures, self._travel_m(waypoint),
+            score_s=score, note=f'频道{channel}保证性示向追踪',
+            target_channel=channel, guaranteed_upper_m=next_upper)
 
     def _clear_expectation_s(self, channel, waypoint, measures):
         """追捕选项的期望耗时：移动 + 检测 + 期望剩余距离 + 末端定位清除。"""
@@ -504,7 +594,7 @@ class Problem3Strategy:
             gain = self._measure_gain(measures, waypoint)
             if gain <= 0.0:
                 continue
-            expected = self._expected_finds(remaining_sources, gain)
+            expected = self._expected_finds(measures, waypoint)
             if expected <= 0.0:
                 continue
             follow_up = self._follow_up_seconds(waypoint) + self.config.endgame_seconds
@@ -571,7 +661,7 @@ class Problem3Strategy:
                 continue
             measures = measures[:max(1, self._search_cap())]
             gain = self._measure_gain(measures, waypoint)
-            expected = self._expected_finds(remaining_sources, gain)
+            expected = self._expected_finds(measures, waypoint)
             if expected <= 0.0:
                 continue
             # 新发现干扰源的后续清除代价也要计入，否则会高估搜索的性价比。
@@ -618,11 +708,27 @@ class Problem3Strategy:
         """
         return np.vstack((np.asarray(self.position, dtype=float), self.candidates))
 
-    def _expected_finds(self, remaining_sources, gain_m2):
-        """均匀先验下的期望发现数：每个频道持源概率为剩余源数 / 频道数。"""
-        if gain_m2 <= 0.0:
+    def _expected_finds(self, channels, waypoint):
+        """逐频道估计本次扫描能新发现的源数。
+
+        已发现频道只计检测成本和后验收紧价值，不再重复计作“新发现”；未发现频道
+        的存在概率由当前已确认源数及 10--16 个总数约束给出，空间命中概率则按该
+        频道当前可能区域中被停靠点可靠接收圆覆盖的比例计算。
+        """
+        source_probability, _, _ = self._unknown_source_probability()
+        if source_probability <= 0.0:
             return 0.0
-        return remaining_sources / CHANNEL_COUNT * gain_m2 / TARGET_AREA_M2
+        expected = 0.0
+        for channel in channels:
+            knowledge = self.channels[channel]
+            if knowledge.status != 'unknown' or not knowledge.is_active:
+                continue
+            total_area = knowledge.possible_area_m2
+            if total_area <= 0.0:
+                continue
+            hit_probability = min(1.0, self._search_gain(channel, waypoint) / total_area)
+            expected += source_probability * hit_probability
+        return expected
 
     def _follow_up_seconds(self, waypoint):
         """在 waypoint 新发现一个目标后，还需要多少移动时间。
@@ -654,9 +760,34 @@ class Problem3Strategy:
             return None
         if search is not None:
             options.append(search)
+        # `_chase_options` 为控制实时计算只前瞻少量频道；到期的保证性追踪必须
+        # 越过这个截断，否则远距离频道可能一直排不进候选集。
+        represented = {plan.target_channel for plan in options
+                       if plan.kind == 'guaranteed_track'}
+        for channel, wait_rounds in self.tracking_wait_rounds.items():
+            if (wait_rounds < self.config.tracking_debt_limit_rounds
+                    or channel in represented
+                    or not self.channels[channel].is_active):
+                continue
+            guaranteed = self._guaranteed_tracking_plan(channel, self.channels[channel])
+            if guaranteed is not None:
+                options.append(guaranteed)
         options = [plan for plan in options if np.isfinite(plan.score_s)]
         if not options:
             return None
+        # 自适应评分不得无限推迟保证性任务：等待达到上限的追踪频道强制服务。
+        due_tracking = [
+            plan for plan in options
+            if (plan.kind == 'guaranteed_track'
+                and self.tracking_wait_rounds.get(plan.target_channel, 0)
+                >= self.config.tracking_debt_limit_rounds)
+        ]
+        if due_tracking:
+            due_tracking.sort(key=lambda plan: (
+                -self.tracking_wait_rounds.get(plan.target_channel, 0),
+                plan.score_s,
+                plan.target_channel))
+            return due_tracking[0]
         options.sort(key=lambda plan: plan.score_s)
         return options[0]
 
@@ -671,19 +802,39 @@ class Problem3Strategy:
             if not self._station_is_new(channel, plan.waypoint):
                 continue
             response = self.context.measure(x, y, channel)
-            self._apply_measure(channel, plan.waypoint, response)
+            guaranteed_upper = (
+                plan.guaranteed_upper_m
+                if plan.kind == 'guaranteed_track' and channel == plan.target_channel
+                else None)
+            self._apply_measure(
+                channel, plan.waypoint, response,
+                guaranteed_upper_m=guaranteed_upper)
             acted = True
         return acted
 
-    def _apply_measure(self, channel, waypoint, response):
+    def _apply_measure(self, channel, waypoint, response, guaranteed_upper_m=None):
+        """应用检测反馈，并同步更新保证性追踪的锚点、示向和距离上界。"""
         self._move_to(waypoint)
         knowledge = self.channels[channel]
         result = response['measure_result']
         virtual = float(response['virtual_time_s'])
         if result == 'direction':
-            knowledge.observe_direction(waypoint[0], waypoint[1], float(response['svd_deg']), virtual)
+            bearing = float(response['svd_deg'])
+            knowledge.observe_direction(waypoint[0], waypoint[1], bearing, virtual)
+            # 普通有效示向由物理接收上界给出 U<=1500；若本次来自保证性追踪，
+            # 余弦定理给出的 qU 更紧，且与随机场景和位置先验无关。
+            upper = (MAX_RECEIVE_RADIUS_M
+                     if guaranteed_upper_m is None else float(guaranteed_upper_m))
+            self.tracking_states[channel] = {
+                'anchor': (float(waypoint[0]), float(waypoint[1])),
+                'bearing_deg': bearing,
+                'upper_m': upper,
+            }
+            self.tracking_wait_rounds[channel] = 0
         elif result == 'near':
             knowledge.observe_near(waypoint[0], waypoint[1], virtual)
+            self.tracking_states.pop(channel, None)
+            self.tracking_wait_rounds[channel] = 0
         else:
             knowledge.observe_no_signal(waypoint[0], waypoint[1], virtual)
         self.current_channel = channel
@@ -709,7 +860,8 @@ class Problem3Strategy:
             if knowledge.cleared_here(waypoint[0], waypoint[1]):
                 continue
             if (knowledge.certain_clear(waypoint[0], waypoint[1])
-                    or knowledge.near_certain_clear(waypoint[0], waypoint[1])):
+                    or knowledge.near_certain_clear(waypoint[0], waypoint[1])
+                    or self._tracking_certain_clear(channel, waypoint)):
                 certain.append(channel)
                 continue
             limit = knowledge.max_distance_m(waypoint[0], waypoint[1])
@@ -721,6 +873,14 @@ class Problem3Strategy:
         speculative.sort(key=lambda item: -item[0])
         return certain + [channel for _, channel in speculative]
 
+    def _tracking_certain_clear(self, channel, waypoint):
+        """判断保证性追踪上界是否已在当前停靠点进入 20 m 清除半径。"""
+        state = self.tracking_states.get(channel)
+        if state is None or state['upper_m'] > CLEAR_RADIUS_M:
+            return False
+        anchor = np.asarray(state['anchor'], dtype=float)
+        return bool(np.linalg.norm(anchor - np.asarray(waypoint, dtype=float)) <= 1e-6)
+
     def _apply_clear(self, channel, waypoint, response):
         self._move_to(waypoint)
         knowledge = self.channels[channel]
@@ -728,6 +888,8 @@ class Problem3Strategy:
         if response['clear_result'] == 'success':
             knowledge.mark_cleared(virtual)
             self.cleared.add(channel)
+            self.tracking_states.pop(channel, None)
+            self.tracking_wait_rounds[channel] = 0
         else:
             knowledge.observe_clear_failure(waypoint[0], waypoint[1], virtual)
         self._record(channel, 'clear', response['clear_result'], response)
@@ -835,6 +997,9 @@ class Problem3Strategy:
                 self.stop_reason = 'stalled'
                 break
             rounds += 1
+            for channel in list(self.tracking_states):
+                if self.channels[channel].is_active:
+                    self.tracking_wait_rounds[channel] += 1
             try:
                 plan = self._decide()
                 if plan is None:
@@ -891,6 +1056,15 @@ class Problem3Strategy:
             'trajectory': self.trajectory,
             'channel_series': self.channel_series,
             'exclusion_certificates': self._exclusion_certificates(),
+            'tracking_states': {
+                channel: {
+                    'anchor': list(state['anchor']),
+                    'bearing_deg': state['bearing_deg'],
+                    'upper_m': state['upper_m'],
+                    'wait_rounds': self.tracking_wait_rounds[channel],
+                }
+                for channel, state in sorted(self.tracking_states.items())
+            },
             'config': {key: value for key, value in asdict(self.config).items()
                        if not key.startswith('_')},
         }

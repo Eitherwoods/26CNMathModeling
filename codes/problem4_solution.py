@@ -3,6 +3,11 @@
 
 连续集合的保证来自保守单元外包；有限假设的最坏反馈评分仅用于选点。
 本模块导入时不发请求。真实会话的 enter/exit 统一由 run_strategy 管理。
+
+**优化目标是虚拟时间**（机器狗在虚拟世界里的耗时），不是本地计算时间。
+虚拟时间口径：移动=距离/5 m·s⁻¹，每次检测 5 s，频道切换 +1 s，光学定位与清除 5 s。
+12 源案例实测构成：移动 36227 s（90.5%）/ 检测 3142 s / 切换 579 s / 清除 60 s，
+合计 40008 s；因此任何改动都要先问"它减少行进了吗"，本地耗时不是评价口径。
 """
 from __future__ import annotations
 
@@ -31,6 +36,7 @@ class Problem4Config:
     hypothesis_limit: int = settings.PROBLEM4_HYPOTHESIS_LIMIT
     search_interval: int = settings.PROBLEM4_SEARCH_INTERVAL
     tracking_limit: int = settings.PROBLEM4_TRACKING_LIMIT
+    fairness_age_rounds: int = settings.PROBLEM4_FAIRNESS_AGE_ROUNDS
     max_rounds: int = settings.PROBLEM4_MAX_ROUNDS
     info_threshold: float = settings.PROBLEM4_INFO_THRESHOLD
     exit_reserve_s: float = settings.PROBLEM4_EXIT_RESERVE_S
@@ -43,7 +49,8 @@ class Problem4Config:
         if not 0 < self.search_spacing_m <= settings.MIN_RECEIVE_RADIUS_M:
             raise ValueError('搜索三角形边长必须在(0,1000]米内。')
         for value in (self.orientation_bins, self.radius_bins, self.hypothesis_limit,
-                      self.search_interval, self.tracking_limit, self.max_rounds):
+                      self.search_interval, self.tracking_limit, self.fairness_age_rounds,
+                      self.max_rounds):
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError('离散规模和调度次数必须为正整数。')
         if not np.isfinite(self.info_threshold) or self.info_threshold < 0:
@@ -113,6 +120,7 @@ class Problem4Strategy:
                          radius_bins=self.config.radius_bins)
                          for c in range(1, settings.CHANNEL_COUNT + 1)}
         self.coverage = {c: set() for c in self.channels}
+        self.channel_series = {c: [] for c in self.channels}
         self.track_counts = {c: 0 for c in self.channels}
         self.last_served = {c: -1 for c in self.channels}
         self.position = np.array(context.state.position, dtype=float)
@@ -210,6 +218,33 @@ class Problem4Strategy:
         _, point = min(shortlisted, key=secondary_score)
         return StopPlan(point, 'track', channel)
 
+    def _channel_travel_m(self, channel):
+        """该频道下一个追踪目标的直线距离，用作虚拟时间的第一成本项。
+
+        优化目标是虚拟时间，其中移动约占九成（12源案例 36227/40008 s）；因此调度
+        必须优先压低行进，而不是追求"每轮都换一个频道"。此处只做排序，不改变
+        任何可行集或完成判据。
+        """
+        knowledge = self.channels[channel]
+        center, _ = knowledge.region_estimate()
+        if center is None:
+            point = knowledge.fallback_point(self.position)
+            return float('inf') if point is None else float(np.linalg.norm(point - self.position))
+        return float(np.linalg.norm(center - self.position))
+
+    def _next_channel(self, detected):
+        """优先服务行进代价最小的已发现频道，超过公平年龄的频道强制优先。
+
+        规则："最久未服务且已超龄"的先做（保证 `tracking_limit` 与后备清除一定
+        轮得到每个频道，杜绝饿死），否则取下一个追踪点最近的频道。这样同一片
+        区域的多个目标会被连续处理，消掉原"按频道轮转"造成的跨场往返。
+        """
+        aged = [c for c in detected
+                if self.round - self.last_served[c] >= self.config.fairness_age_rounds]
+        if aged:
+            return min(aged, key=lambda c: (self.last_served[c], c))
+        return min(detected, key=lambda c: (self._channel_travel_m(c), self.last_served[c], c))
+
     def decide_direction(self):
         """第一项决策输出方向及任务依据，覆盖和已知频道均不会被永久搁置。"""
         search = self._search_plan()
@@ -219,8 +254,7 @@ class Problem4Strategy:
         elif search is not None and (not detected or self.round % self.config.search_interval == 0):
             plan = search
         elif detected:
-            channel = min(detected, key=lambda c: (self.last_served[c], c))
-            plan = self._tracking_plan(channel)
+            plan = self._tracking_plan(self._next_channel(detected))
         else:
             plan = search
         if plan is None:
@@ -286,6 +320,11 @@ class Problem4Strategy:
             self._commit_action(point, channel, 'measure', response)
             knowledge.observe(response['measure_result'], *point, bearing_deg=response.get('svd_deg'),
                               virtual_time_s=response['virtual_time_s'])
+            series = self.channel_series[channel]
+            limit = knowledge.max_distance_m(*point)
+            series.append({'measure_count': len(series) + 1,
+                           'limit_m': None if limit is None else float(limit),
+                           'result': response['measure_result']})
             for index in np.flatnonzero(np.linalg.norm(self.waypoints - point, axis=1) <= 1e-7):
                 self.coverage[channel].add(int(index))
             acted = True
@@ -361,11 +400,16 @@ class Problem4Strategy:
         return {'problem': 4, 'stop_reason': self.stop_reason,
                 'completed': self.stop_reason in ('all_channels_resolved', 'cleared_limit'),
                 'cleared_channels': [c for c, k in self.channels.items() if k.status == 'cleared'],
+                'unresolved_channels': sorted(c for c, k in self.channels.items()
+                                              if k.status in ('unknown', 'detected')),
+                'inconsistent_channels': sorted(c for c, k in self.channels.items()
+                                                if k.status == 'inconsistent'),
                 'start_virtual_time_s': self.start_virtual,
                 'end_virtual_time_s': float(self.context.state.virtual_time_s),
                 'real_elapsed_s': time.monotonic() - self.started_at,
                 'moved_distance_m': self.moved_distance_m, 'steps': self.steps,
-                'trajectory': self.trajectory, 'config': asdict(self.config),
+                'trajectory': self.trajectory, 'channel_series': self.channel_series,
+                'search_waypoints': len(self.waypoints), 'config': asdict(self.config),
                 'planner_errors': int(self.stop_reason in ('model_inconsistent', 'no_plan', 'no_accepted_action')),
                 'channels': {c: {'status': k.status, 'type': k.type_status,
                                   'coverage_done': len(self.coverage[c]),
@@ -391,13 +435,27 @@ def run_mission(context, config=None):
     return Problem4Strategy(context, config).run()
 
 
+def is_offline_run(context):
+    """判断本次会话是否跑在本地桩上：离线桩的记录是自检产物，不是演练成绩。"""
+    from .offline_stub import OfflineStub
+    return isinstance(getattr(context.client, 'transport', None), OfflineStub)
+
+
 def solve(context):
-    """运行器策略入口；仅在被明确调用时执行会话与保存问题四记录。"""
+    """运行器策略入口；仅在被明确调用时执行会话与保存问题四记录。
+
+    记录目录按 `output/README.md` 的约定二分：**离线自检进 `output/protocol`**，
+    在线（模拟器演练/正式）进 `output/Problem4`，文件名以 `offline-` 前缀进一步区分。
+    """
     record = run_mission(context)
     summary = summarize(record)
+    offline = is_offline_run(context)
     try:
-        settings.PROBLEM4_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        target = settings.PROBLEM4_OUTPUT_DIR / f'mission_p4_{time.time_ns()}.json'
+        target_dir = settings.record_dir_for(context.problem, offline=offline)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime('%Y%m%d-%H%M%S')
+        prefix = 'offline-' if offline else ''
+        target = target_dir / f'{prefix}mission_p{context.problem}_{stamp}.json'
         target.write_text(json.dumps({'summary': summary, 'record': record},
                                     ensure_ascii=False, indent=2), encoding='utf-8')
         summary['record_path'] = str(target)
@@ -407,15 +465,55 @@ def solve(context):
     return summary
 
 
+def build_scenario(sources=12, seed=1, directional=None):
+    """构造本地自检案例：directional 为 None 时取一半定向源，0 表示全部全向。"""
+    from .scenario import random_scenario
+    from .scenario_p4 import mixed_scenario
+    count = int(sources)
+    if count < 2 or directional == 0:
+        return random_scenario(seed=seed, n_sources=count)
+    share = count // 2 if directional is None or directional < 0 else int(directional)
+    return mixed_scenario(seed=seed, n_sources=count,
+                          n_directional=max(1, min(share, count - 1)))
+
+
 def main(argv=None):
-    """无会话的结果汇总入口；策略运行使用codes.run_robot显式选择problem=4。"""
-    parser = argparse.ArgumentParser(description='读取问题四任务记录，生成统计摘要。')
-    parser.add_argument('record', type=str)
-    parser.add_argument('--true-total', type=int)
-    args = parser.parse_args(argv)
+    """问题四入口：给记录文件则只汇总；否则用本地桩跑一局自检（不连接官方模拟器）。"""
     from pathlib import Path
-    data = json.loads(Path(args.record).read_text(encoding='utf-8'))
-    print(json.dumps(summarize(data.get('record', data), args.true_total), ensure_ascii=False, indent=2))
+
+    parser = argparse.ArgumentParser(description='问题四离线自检与记录汇总入口。')
+    parser.add_argument('record', nargs='?', default=None,
+                        help='已有任务记录 JSON；省略则在本地桩上跑一局')
+    parser.add_argument('--true-total', type=int, help='真实干扰源总数；未知时不填')
+    parser.add_argument('--sources', type=int, default=12, help='自检案例干扰源个数')
+    parser.add_argument('--seed', type=int, default=1, help='自检案例随机种子')
+    parser.add_argument('--directional', type=int, default=None,
+                        help='定向源个数；默认取一半，0 表示全部全向')
+    parser.add_argument('--latency', type=float, default=0.0, help='每次请求的附加真实延迟（秒）')
+    parser.add_argument('--log', default='output/protocol/offline-p4.jsonl',
+                        help='离线协议日志；与 run_robot --mode offline 的默认路径一致')
+    parser.add_argument('--figures', action='store_true', help='输出任务图（需要 matplotlib）')
+    args = parser.parse_args(argv)
+
+    if args.record is not None:
+        data = json.loads(Path(args.record).read_text(encoding='utf-8'))
+        print(json.dumps(summarize(data.get('record', data), args.true_total),
+                         ensure_ascii=False, indent=2))
+        return None
+
+    from .offline_stub import OfflineStub
+    from .protocol import RobotClient
+    from .strategy import run_strategy
+
+    scenario = build_scenario(args.sources, args.seed, args.directional)
+    stub = OfflineStub(sources=scenario.sources, latency_s=args.latency, location_error_deg=0.9)
+    client = RobotClient('offline-team', stub, log_path=args.log)
+    result = run_strategy(client, solve, problem=4)
+    print(json.dumps(result['algorithm_result'], ensure_ascii=False, indent=2))
+    if args.figures:
+        from .problem4_plotting import plot_mission_from_path
+        plot_mission_from_path(result['algorithm_result'].get('record_path'), scenario=scenario)
+    return result
 
 
 if __name__ == '__main__':
