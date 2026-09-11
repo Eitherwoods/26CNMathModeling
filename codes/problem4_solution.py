@@ -1,0 +1,422 @@
+# -*- coding: utf-8 -*-
+"""问题四五项决策：多方向搜索、联合反馈追踪及有限覆盖清除。
+
+连续集合的保证来自保守单元外包；有限假设的最坏反馈评分仅用于选点。
+本模块导入时不发请求。真实会话的 enter/exit 统一由 run_strategy 管理。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import time
+from dataclasses import asdict, dataclass
+
+import numpy as np
+
+from . import config as settings
+from .problem3_model import Lattice
+from .problem3_solution import summarize as summarize_base
+from .problem4_model import Problem4Knowledge, triangular_search_waypoints
+from .strategy import BudgetReached
+
+
+@dataclass(frozen=True)
+class Problem4Config:
+    """问题四待调参数；位置单元必须能被一个20米清除圆覆盖。"""
+
+    lattice_spacing_m: float = settings.PROBLEM4_LATTICE_SPACING_M
+    search_spacing_m: float = settings.PROBLEM4_SEARCH_SPACING_M
+    orientation_bins: int = settings.PROBLEM4_ORIENTATION_BINS
+    radius_bins: int = settings.PROBLEM4_RADIUS_BINS
+    hypothesis_limit: int = settings.PROBLEM4_HYPOTHESIS_LIMIT
+    search_interval: int = settings.PROBLEM4_SEARCH_INTERVAL
+    tracking_limit: int = settings.PROBLEM4_TRACKING_LIMIT
+    max_rounds: int = settings.PROBLEM4_MAX_ROUNDS
+    info_threshold: float = settings.PROBLEM4_INFO_THRESHOLD
+    exit_reserve_s: float = settings.PROBLEM4_EXIT_RESERVE_S
+    step_lengths_m: tuple = settings.PROBLEM4_STEP_LENGTHS_M
+
+    def __post_init__(self):
+        """在任何动作之前拒绝破坏几何保证或调度活性的参数。"""
+        if not (0 < self.lattice_spacing_m * np.sqrt(2) / 2 < settings.CLEAR_RADIUS_M):
+            raise ValueError('位置单元覆盖半径必须严格小于20米。')
+        if not 0 < self.search_spacing_m <= settings.MIN_RECEIVE_RADIUS_M:
+            raise ValueError('搜索三角形边长必须在(0,1000]米内。')
+        for value in (self.orientation_bins, self.radius_bins, self.hypothesis_limit,
+                      self.search_interval, self.tracking_limit, self.max_rounds):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError('离散规模和调度次数必须为正整数。')
+        if not np.isfinite(self.info_threshold) or self.info_threshold < 0:
+            raise ValueError('信息阈值必须非负且有限。')
+        if not np.isfinite(self.exit_reserve_s) or self.exit_reserve_s < 0:
+            raise ValueError('退出预留时间必须非负且有限。')
+        if not self.step_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.step_lengths_m):
+            raise ValueError('候选步长必须为正的有限值。')
+
+
+@dataclass
+class StopPlan:
+    """前两项决策产生的拟停靠点；尚未代表实际移动。"""
+
+    waypoint: np.ndarray
+    kind: str
+    channel: int | None = None
+    search_index: int | None = None
+
+
+def feedback_score(hypotheses, waypoint):
+    """枚举样本相容反馈，返回最坏位置外接半径和最坏权重收缩率。
+
+示向度按±1度区间的端点枚举，跨0度使用环形角差；不假定误差概率分布。
+单元中心不是精确可行参数，此分数只能排序，不能用于排除或可靠清除。
+"""
+    if len(hypotheses) == 0:
+        return float('inf'), 0.0
+    offset = hypotheses[:, :2] - waypoint
+    distances = np.linalg.norm(offset, axis=1)
+    angles = np.deg2rad(hypotheses[:, 4])
+    front = -offset[:, 0] * np.cos(angles) - offset[:, 1] * np.sin(angles) >= 0
+    received = (distances <= hypotheses[:, 2]) & ((hypotheses[:, 3] == 0) | front)
+    near = received & (distances <= settings.NEAR_DISTANCE_M)
+    direction = received & ~near
+    bearings = np.rad2deg(np.arctan2(offset[:, 1], offset[:, 0])) % 360
+    groups = [~received, near]
+    error = settings.ANGLE_ERROR_DEG
+    for angle in np.concatenate((bearings[direction] - error, bearings[direction] + error)):
+        difference = np.abs((bearings - angle + 180) % 360 - 180)
+        groups.append(direction & (difference <= error + 1e-9))
+    worst_radius, worst_count = 0.0, 0
+    for group in groups:
+        points = hypotheses[group, :2]
+        if not len(points):
+            continue
+        center = (points.min(axis=0) + points.max(axis=0)) / 2
+        worst_radius = max(worst_radius, float(np.linalg.norm(points - center, axis=1).max()))
+        worst_count = max(worst_count, len(points))
+    return worst_radius, 1.0 - worst_count / len(hypotheses)
+
+
+class Problem4Strategy:
+    """按频道保存覆盖证据，交替推进有限搜索与有限清除的在线策略。"""
+
+    def __init__(self, context, config=None):
+        """初始化几何与记录；只读取公开协议状态，不接触案例真值。"""
+        if context.problem != 4:
+            raise ValueError('问题四策略仅适用于problem=4。')
+        self.context = context
+        self.config = config or Problem4Config()
+        self.started_at = time.monotonic()
+        self.lattice = Lattice.build(self.config.lattice_spacing_m)
+        self.waypoints = triangular_search_waypoints(self.config.search_spacing_m)
+        self.channels = {c: Problem4Knowledge(c, self.lattice,
+                         orientation_bins=self.config.orientation_bins,
+                         radius_bins=self.config.radius_bins)
+                         for c in range(1, settings.CHANNEL_COUNT + 1)}
+        self.coverage = {c: set() for c in self.channels}
+        self.track_counts = {c: 0 for c in self.channels}
+        self.last_served = {c: -1 for c in self.channels}
+        self.position = np.array(context.state.position, dtype=float)
+        self.current_channel = int(context.state.channel)
+        self.start_virtual = float(context.state.virtual_time_s)
+        self.steps, self.trajectory = [], [self.position.tolist()]
+        self.moved_distance_m = 0.0
+        self.round = 0
+        self.stop_reason = 'running'
+
+    def _limited(self):
+        """同时检查实际时限、协议状态和虚拟时限，预留正常退出时间。"""
+        remaining = self.context.remaining_real_duration_s
+        return (self.context.should_stop()
+                or (remaining is not None and remaining <= self.config.exit_reserve_s)
+                or self.context.state.virtual_time_s >= self._virtual_limit())
+
+    def _virtual_limit(self):
+        """以enter反馈为准获取虚拟时间上限，兼容纯内存脚手架上下文。"""
+        limit = getattr(self.context.state, 'max_virtual_duration_s', None)
+        return settings.VIRTUAL_BUDGET_S if limit is None else float(limit)
+
+    def _check_action_budget(self, point, kind, channel):
+        """发令前计入本次移动和动作最坏耗时，避免动作跨越虚拟时限。"""
+        travel = float(np.linalg.norm(point - self.position)) / settings.ROBOT_SPEED_MPS
+        action = (settings.MEASURE_TIME_S + (channel != self.current_channel)
+                  if kind == 'measure' else settings.CLEAR_FAIL_TIME_S + settings.CLEAR_TIME_S)
+        if self._limited() or self.context.state.virtual_time_s + travel + action >= self._virtual_limit():
+            raise BudgetReached('问题四本次动作将耗尽时间预算。')
+
+    def _detected(self):
+        """返回存在性已证实、仍待清除的频道。"""
+        return [c for c, knowledge in self.channels.items() if knowledge.status == 'detected']
+
+    def _search_plan(self):
+        """选择尚欠至少一个未知频道的最近网格顶点，保证覆盖进度单调。"""
+        unknown = [c for c, k in self.channels.items() if k.status == 'unknown']
+        candidates = [i for i in range(len(self.waypoints))
+                      if any(i not in self.coverage[c] for c in unknown)]
+        if not candidates:
+            return None
+        index = min(candidates, key=lambda i: np.linalg.norm(self.waypoints[i] - self.position))
+        return StopPlan(self.waypoints[index].copy(), 'search', search_index=index)
+
+    def _tracking_candidates(self, knowledge):
+        """生成接近、换侧、历史有效点凸包及失联缩步候选。"""
+        center, _ = knowledge.region_estimate()
+        if center is None:
+            return []
+        vector = center - self.position
+        length = float(np.linalg.norm(vector))
+        axis = vector / length if length > 1e-9 else np.array([1.0, 0.0])
+        normal = np.array([-axis[1], axis[0]])
+        points = [center]
+        lengths = list(self.config.step_lengths_m)
+        if knowledge.observations and knowledge.observations[-1].result == 'no_signal':
+            lengths += [value / 2 for value in self.config.step_lengths_m]
+        for distance in lengths:
+            points.extend([self.position + distance * axis,
+                           center + distance * normal, center - distance * normal])
+        positive = [np.array([o.x, o.y]) for o in knowledge.observations
+                    if o.result in ('direction', 'near')]
+        if len(positive) >= 2:
+            points.append(np.mean(positive, axis=0))
+            points.extend((positive[-1] + p) / 2 for p in positive[:-1])
+        return [p for p in points if knowledge.measured_at(*p) is None]
+
+    def _tracking_plan(self, channel):
+        """先限定有限追踪轮数，再转入覆盖清除，防止失联后无限往返。"""
+        knowledge = self.channels[channel]
+        center, _ = knowledge.region_estimate()
+        if center is not None and knowledge.certain_clear(*center) and not knowledge.cleared_here(*center):
+            return StopPlan(center, 'reliable_clear', channel)
+        if self.track_counts[channel] >= self.config.tracking_limit:
+            point = knowledge.fallback_point(self.position)
+            return None if point is None else StopPlan(point, 'fallback_clear', channel)
+        candidates = self._tracking_candidates(knowledge)
+        if not candidates:
+            self.track_counts[channel] = self.config.tracking_limit
+            point = knowledge.fallback_point(self.position)
+            return None if point is None else StopPlan(point, 'fallback_clear', channel)
+        hypotheses = knowledge.planning_hypotheses(self.config.hypothesis_limit)
+        scores = [(feedback_score(hypotheses, p), p) for p in candidates]
+        best_radius = min(score[0] for score, _ in scores)
+        shortlisted = [(score, p) for score, p in scores
+                       if score[0] <= best_radius * 1.05 + 1e-9]
+        # 半径接近时，以联合信息、移动代价区分；权重不解释为成功概率。
+        shared_hypotheses = [self.channels[c].planning_hypotheses(self.config.hypothesis_limit)
+                             for c in self._detected() if c != channel]
+        def secondary_score(item):
+            """合并多个已发现频道的信息价值，移动成本仅计一次。"""
+            score, point = item
+            shared_gain = score[1] + sum(feedback_score(h, point)[1] for h in shared_hypotheses)
+            return np.linalg.norm(point - self.position) / settings.ROBOT_SPEED_MPS - 60 * shared_gain
+        _, point = min(shortlisted, key=secondary_score)
+        return StopPlan(point, 'track', channel)
+
+    def decide_direction(self):
+        """第一项决策输出方向及任务依据，覆盖和已知频道均不会被永久搁置。"""
+        search = self._search_plan()
+        detected = self._detected()
+        if self.round == 0:
+            plan = StopPlan(self.position.copy(), 'initial')
+        elif search is not None and (not detected or self.round % self.config.search_interval == 0):
+            plan = search
+        elif detected:
+            channel = min(detected, key=lambda c: (self.last_served[c], c))
+            plan = self._tracking_plan(channel)
+        else:
+            plan = search
+        if plan is None:
+            return None, None
+        vector = plan.waypoint - self.position
+        length = float(np.linalg.norm(vector))
+        return (vector / length if length > 1e-9 else np.zeros(2)), plan
+
+    def decide_distance(self, direction, plan):
+        """第二项沿已选方向比较停靠长度，必要覆盖与后备清除保留精确端点。"""
+        if plan.kind != 'track':
+            return plan
+        length = float(np.linalg.norm(plan.waypoint - self.position))
+        knowledge = self.channels[plan.channel]
+        candidates = [self.position + direction * value for value in
+                      sorted(set([length] + [v for v in self.config.step_lengths_m if v < length]))]
+        candidates = [p for p in candidates if knowledge.measured_at(*p) is None]
+        if not candidates:
+            return plan
+        hypotheses = knowledge.planning_hypotheses(self.config.hypothesis_limit)
+        point = min(candidates, key=lambda p: (feedback_score(hypotheses, p)[0],
+                                               float(np.linalg.norm(p - self.position))))
+        return StopPlan(point, plan.kind, plan.channel)
+
+    def _commit_action(self, point, channel, kind, response):
+        """仅accepted=true后登记真实移动和动作；清除不会修改测向频道。"""
+        if response.get('accepted') is not True:
+            raise RuntimeError('动作未获确认，禁止更新位置或覆盖证据。')
+        self.moved_distance_m += float(np.linalg.norm(point - self.position))
+        self.position = np.asarray(point, dtype=float).copy()
+        self.trajectory.append(self.position.tolist())
+        if kind == 'measure':
+            self.current_channel = channel
+        self.steps.append({'kind': kind, 'channel': channel, 'x': float(point[0]),
+                           'y': float(point[1]), 'result': response[f'{kind}_result'],
+                           'virtual_time_s': float(response['virtual_time_s'])})
+
+    def execute_measures(self, plan):
+        """第三项逐频道扫描并即时更新；本阶段不插入任何清除。"""
+        acted = False
+        order = sorted(self.channels, key=lambda c: (c != self.current_channel, c))
+        for channel in order:
+            if self._limited():
+                break
+            knowledge = self.channels[channel]
+            point = plan.waypoint
+            if knowledge.status not in ('unknown', 'detected') or knowledge.measured_at(*point) is not None:
+                continue
+            if knowledge.status == 'detected' and knowledge.certain_clear(*point):
+                continue
+            necessary = (plan.kind == 'initial' or
+                         (plan.kind == 'search' and knowledge.status == 'unknown') or
+                         (plan.kind == 'track' and channel == plan.channel))
+            if not necessary:
+                if knowledge.status != 'detected' or plan.kind == 'fallback_clear':
+                    continue
+                _, gain = feedback_score(knowledge.planning_hypotheses(self.config.hypothesis_limit), point)
+                cost = settings.MEASURE_TIME_S + (channel != self.current_channel)
+                if gain / cost < self.config.info_threshold:
+                    continue
+            self._check_action_budget(point, 'measure', channel)
+            response = self.context.measure(float(point[0]), float(point[1]), channel)
+            self._commit_action(point, channel, 'measure', response)
+            knowledge.observe(response['measure_result'], *point, bearing_deg=response.get('svd_deg'),
+                              virtual_time_s=response['virtual_time_s'])
+            for index in np.flatnonzero(np.linalg.norm(self.waypoints - point, axis=1) <= 1e-7):
+                self.coverage[channel].add(int(index))
+            acted = True
+        return acted
+
+    def execute_clears(self, plan):
+        """第四项使用扫描后的最新位置外包；无信号不否决光学清除。"""
+        acted = False
+        point = plan.waypoint
+        for channel in self._detected():
+            if self._limited():
+                break
+            knowledge = self.channels[channel]
+            if knowledge.cleared_here(*point):
+                continue
+            reliable = knowledge.certain_clear(*point) or knowledge.near_certain_clear(*point)
+            fallback = plan.kind == 'fallback_clear' and plan.channel == channel
+            if not (reliable or fallback):
+                continue
+            self._check_action_budget(point, 'clear', channel)
+            response = self.context.clear(float(point[0]), float(point[1]), channel)
+            self._commit_action(point, channel, 'clear', response)
+            if response['clear_result'] == 'success':
+                knowledge.mark_cleared(response['virtual_time_s'])
+            else:
+                knowledge.observe_clear_failure(*point, virtual_time_s=response['virtual_time_s'])
+            acted = True
+        return acted
+
+    def finished(self):
+        """第五项只认可完整覆盖或清除数上界，异常空集不作为完成证据。"""
+        for channel, knowledge in self.channels.items():
+            if knowledge.status == 'unknown' and len(self.coverage[channel]) == len(self.waypoints):
+                knowledge.status = 'excluded'
+        if any(k.status == 'inconsistent' for k in self.channels.values()):
+            return 'model_inconsistent'
+        if sum(k.status == 'cleared' for k in self.channels.values()) == settings.MAX_SOURCE_COUNT:
+            return 'cleared_limit'
+        if all(k.status in ('cleared', 'excluded') for k in self.channels.values()):
+            return 'all_channels_resolved'
+        return None
+
+    def run(self):
+        """执行有界五项循环，所有受限终止均明确区别于任务完成。"""
+        for self.round in range(self.config.max_rounds):
+            reason = self.finished()
+            if reason or self._limited():
+                self.stop_reason = reason or 'budget_limit'
+                break
+            try:
+                direction, plan = self.decide_direction()
+                if plan is None:
+                    self.stop_reason = 'no_plan'
+                    break
+                plan = self.decide_distance(direction, plan)
+                acted = self.execute_measures(plan)
+                acted = self.execute_clears(plan) or acted
+                if plan.channel is not None:
+                    self.last_served[plan.channel] = self.round
+                    self.track_counts[plan.channel] += 1
+                if not acted:
+                    self.stop_reason = 'budget_limit' if self._limited() else 'no_accepted_action'
+                    break
+            except BudgetReached:
+                self.stop_reason = 'budget_limit'
+                break
+        else:
+            self.stop_reason = self.finished() or 'round_limit'
+        return self.result()
+
+    def result(self):
+        """输出可复核轨迹、逐频道覆盖进度及模型异常，不编造未知总数。"""
+        return {'problem': 4, 'stop_reason': self.stop_reason,
+                'completed': self.stop_reason in ('all_channels_resolved', 'cleared_limit'),
+                'cleared_channels': [c for c, k in self.channels.items() if k.status == 'cleared'],
+                'start_virtual_time_s': self.start_virtual,
+                'end_virtual_time_s': float(self.context.state.virtual_time_s),
+                'real_elapsed_s': time.monotonic() - self.started_at,
+                'moved_distance_m': self.moved_distance_m, 'steps': self.steps,
+                'trajectory': self.trajectory, 'config': asdict(self.config),
+                'planner_errors': int(self.stop_reason in ('model_inconsistent', 'no_plan', 'no_accepted_action')),
+                'channels': {c: {'status': k.status, 'type': k.type_status,
+                                  'coverage_done': len(self.coverage[c]),
+                                  'coverage_required': len(self.waypoints)}
+                             for c, k in self.channels.items()}}
+
+
+def summarize(record, true_total=None):
+    """复用题目统计口径，并单列是否已证明完成。"""
+    if true_total is not None and (isinstance(true_total, bool) or not isinstance(true_total, int)
+                                   or not len(record['cleared_channels']) <= true_total <= settings.CHANNEL_COUNT
+                                   or true_total <= 0):
+        raise ValueError('真实总数须为正整数，且不能小于已清除数或超过20。')
+    steps = record['steps']
+    return {**summarize_base(record, true_total), 'completed': record['completed'],
+            'no_signal_count': sum(s['kind'] == 'measure' and s['result'] == 'no_signal' for s in steps),
+            'clear_failure_count': sum(s['kind'] == 'clear' and s['result'] == 'no_target_in_range'
+                                       for s in steps)}
+
+
+def run_mission(context, config=None):
+    """供测试脚手架和协议入口注入上下文；不会读取隐藏案例数据。"""
+    return Problem4Strategy(context, config).run()
+
+
+def solve(context):
+    """运行器策略入口；仅在被明确调用时执行会话与保存问题四记录。"""
+    record = run_mission(context)
+    summary = summarize(record)
+    try:
+        settings.PROBLEM4_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        target = settings.PROBLEM4_OUTPUT_DIR / f'mission_p4_{time.time_ns()}.json'
+        target.write_text(json.dumps({'summary': summary, 'record': record},
+                                    ensure_ascii=False, indent=2), encoding='utf-8')
+        summary['record_path'] = str(target)
+    except OSError as exc:
+        summary['record_path'] = None
+        summary['record_error'] = str(exc)
+    return summary
+
+
+def main(argv=None):
+    """无会话的结果汇总入口；策略运行使用codes.run_robot显式选择problem=4。"""
+    parser = argparse.ArgumentParser(description='读取问题四任务记录，生成统计摘要。')
+    parser.add_argument('record', type=str)
+    parser.add_argument('--true-total', type=int)
+    args = parser.parse_args(argv)
+    from pathlib import Path
+    data = json.loads(Path(args.record).read_text(encoding='utf-8'))
+    print(json.dumps(summarize(data.get('record', data), args.true_total), ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    main()

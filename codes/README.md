@@ -172,7 +172,7 @@ python -m codes.run_robot --mode offline --problem 3 --strategy codes.strategy_p
 确认算法可用后，把上面的演练命令中的 `--strategy codes.strategy_demo:solve`
 替换成 `--strategy codes.strategy_p3:solve`；问题4同理使用对应文件和编号。
 问题三的 `codes/strategy_p3.py` 已实现（转发到 `problem3_solution`）；
-问题四尚未实现，当前可直接运行的示例仍是 `codes.strategy_demo:solve`。
+问题四入口为 `codes.strategy_p4:solve`（转发到 `problem4_solution`），已完成代码和测试脚手架，尚未运行测试。
 `--strategy`会导入并执行本地Python代码，只填写自己信任的模块。
 
 ## 问题三运行与自检
@@ -190,6 +190,13 @@ python -m codes.problem3_solution --seed 7 --sources 12 --figures
 统计量写入 `output/Problem3/`，`--figures` 时另存 `figures/Problem3/`。
 **这些统计量不是官方演练成绩**，只用于验证"模型 + 策略 + 桩 + 绘图"链路可用。
 按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
+
+## 问题四代码与待执行测试
+
+建模审查见 `solutions/REVIEW-Q4-2026-09-11.md`，实现、近似边界与运行说明见
+`solutions/problem4_flow.md`。联合模型为 `problem4_model.py`，五项决策为
+`problem4_solution.py`；`scenario_p4.py` 提供混合源案例，`test_problem4.py`
+提供后续单元和离线回归入口。问题四本轮仅做文本审查，未运行测试、编译或模拟器会话。
 
 ## 连接约束
 

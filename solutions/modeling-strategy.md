@@ -1041,7 +1041,7 @@ $$
 为进行数值评分，可构造带权离散假设集 $\widetilde{\mathcal H}_c$。尚未发现的频道在其中保留“不存在目标”的假设，该假设预测检测结果始终为无信号；获得有效信号后将其移除。设 $W$ 表示当前假设的权重总和，得到反馈后对相容假设保留原权重，则可定义最坏反馈下的信息收缩评分
 
 $$
-I_c(X)=1-sup_{o\in\mathcal O_c(X)}
+I_c(X)=1-\sup_{o\in\mathcal O_c(X)}
 \frac{W\bigl(\widetilde{\mathcal H}_c^o(X)\bigr)}
 {W\bigl(\widetilde{\mathcal H}_c\bigr)}.
 $$
