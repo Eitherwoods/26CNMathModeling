@@ -1,0 +1,5443 @@
+{
+  "summary": {
+    "cleared_channels": [
+      1,
+      3,
+      4,
+      6,
+      7,
+      9,
+      11,
+      12,
+      13,
+      16,
+      17,
+      20
+    ],
+    "cleared_count": 12,
+    "true_total": null,
+    "cleared_ratio": null,
+    "total_virtual_time_s": 5594.615,
+    "average_clear_time_s": 466.218,
+    "program_runtime_s": 30.765,
+    "stop_reason": "all_channels_resolved",
+    "unresolved_channels": [],
+    "inconsistent_channels": [],
+    "actions": 276,
+    "moved_distance_m": 19898.077,
+    "planner_errors": 0
+  },
+  "record": {
+    "stop_reason": "all_channels_resolved",
+    "cleared_channels": [
+      1,
+      3,
+      4,
+      6,
+      7,
+      9,
+      11,
+      12,
+      13,
+      16,
+      17,
+      20
+    ],
+    "unresolved_channels": [],
+    "inconsistent_channels": [],
+    "start_virtual_time_s": 0.0,
+    "end_virtual_time_s": 5594.615413,
+    "real_elapsed_s": 30.764999999999418,
+    "moved_distance_m": 19898.07706470169,
+    "actions": 276,
+    "planner_errors": 0,
+    "steps": [
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 5.0,
+        "real_elapsed_s": 0.031
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 11.0,
+        "real_elapsed_s": 0.047
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 17.0,
+        "real_elapsed_s": 0.078
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 23.0,
+        "real_elapsed_s": 0.093
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 29.0,
+        "real_elapsed_s": 0.125
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 35.0,
+        "real_elapsed_s": 0.125
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 41.0,
+        "real_elapsed_s": 0.14
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 47.0,
+        "real_elapsed_s": 0.14
+      },
+      {
+        "kind": "measure",
+        "channel": 9,
+        "result": "direction",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 53.0,
+        "real_elapsed_s": 0.156
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 59.0,
+        "real_elapsed_s": 0.187
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 65.0,
+        "real_elapsed_s": 0.187
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 71.0,
+        "real_elapsed_s": 0.203
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 77.0,
+        "real_elapsed_s": 0.203
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 83.0,
+        "real_elapsed_s": 0.203
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 89.0,
+        "real_elapsed_s": 0.218
+      },
+      {
+        "kind": "measure",
+        "channel": 16,
+        "result": "direction",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 95.0,
+        "real_elapsed_s": 0.234
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 101.0,
+        "real_elapsed_s": 0.25
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 107.0,
+        "real_elapsed_s": 0.25
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 113.0,
+        "real_elapsed_s": 0.265
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 0.0,
+        "virtual_time_s": 119.0,
+        "real_elapsed_s": 0.265
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "no_signal",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 175.0,
+        "real_elapsed_s": 1.14
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 181.0,
+        "real_elapsed_s": 1.14
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "no_signal",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 187.0,
+        "real_elapsed_s": 1.172
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 193.0,
+        "real_elapsed_s": 1.172
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 199.0,
+        "real_elapsed_s": 1.187
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 205.0,
+        "real_elapsed_s": 1.187
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 211.0,
+        "real_elapsed_s": 1.203
+      },
+      {
+        "kind": "measure",
+        "channel": 9,
+        "result": "direction",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 217.0,
+        "real_elapsed_s": 1.218
+      },
+      {
+        "kind": "measure",
+        "channel": 16,
+        "result": "direction",
+        "x": -125.00000000000011,
+        "y": -216.50635094610962,
+        "virtual_time_s": 223.0,
+        "real_elapsed_s": 1.234
+      },
+      {
+        "kind": "measure",
+        "channel": 16,
+        "result": "direction",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 278.0,
+        "real_elapsed_s": 2.078
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 284.0,
+        "real_elapsed_s": 2.093
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 290.0,
+        "real_elapsed_s": 2.109
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 296.0,
+        "real_elapsed_s": 2.125
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 302.0,
+        "real_elapsed_s": 2.14
+      },
+      {
+        "kind": "measure",
+        "channel": 9,
+        "result": "direction",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 308.0,
+        "real_elapsed_s": 2.14
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 314.0,
+        "real_elapsed_s": 2.172
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": -125.00000000000016,
+        "y": -466.5063509461096,
+        "virtual_time_s": 320.0,
+        "real_elapsed_s": 2.203
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 340.815061,
+        "real_elapsed_s": 3.093
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 346.815061,
+        "real_elapsed_s": 3.109
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 352.815061,
+        "real_elapsed_s": 3.125
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 358.815061,
+        "real_elapsed_s": 3.14
+      },
+      {
+        "kind": "measure",
+        "channel": 9,
+        "result": "direction",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 364.815061,
+        "real_elapsed_s": 3.156
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "no_signal",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 370.815061,
+        "real_elapsed_s": 3.156
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 376.815061,
+        "real_elapsed_s": 3.172
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 382.815061,
+        "real_elapsed_s": 3.187
+      },
+      {
+        "kind": "measure",
+        "channel": 16,
+        "result": "direction",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 388.815061,
+        "real_elapsed_s": 3.203
+      },
+      {
+        "kind": "clear",
+        "channel": 16,
+        "result": "success",
+        "x": -185.0,
+        "y": -415.0,
+        "virtual_time_s": 393.815061,
+        "real_elapsed_s": 3.25
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 449.815061,
+        "real_elapsed_s": 3.875
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 455.815061,
+        "real_elapsed_s": 3.922
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 461.815061,
+        "real_elapsed_s": 3.922
+      },
+      {
+        "kind": "measure",
+        "channel": 9,
+        "result": "direction",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 467.815061,
+        "real_elapsed_s": 3.953
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "no_signal",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 473.815061,
+        "real_elapsed_s": 4.0
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 479.815061,
+        "real_elapsed_s": 4.0
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 485.815061,
+        "real_elapsed_s": 4.015
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -435.0,
+        "y": -414.99999999999994,
+        "virtual_time_s": 491.815061,
+        "real_elapsed_s": 4.031
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "no_signal",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 540.61693,
+        "real_elapsed_s": 4.734
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 546.61693,
+        "real_elapsed_s": 4.765
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 552.61693,
+        "real_elapsed_s": 4.765
+      },
+      {
+        "kind": "measure",
+        "channel": 9,
+        "result": "near",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 558.61693,
+        "real_elapsed_s": 4.781
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 564.61693,
+        "real_elapsed_s": 4.781
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 570.61693,
+        "real_elapsed_s": 4.797
+      },
+      {
+        "kind": "clear",
+        "channel": 9,
+        "result": "success",
+        "x": -605.0,
+        "y": -285.0,
+        "virtual_time_s": 575.61693,
+        "real_elapsed_s": 4.859
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 630.61693,
+        "real_elapsed_s": 5.39
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 636.61693,
+        "real_elapsed_s": 5.406
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 642.61693,
+        "real_elapsed_s": 5.437
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 648.61693,
+        "real_elapsed_s": 5.437
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 654.61693,
+        "real_elapsed_s": 5.453
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 660.61693,
+        "real_elapsed_s": 5.468
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 666.61693,
+        "real_elapsed_s": 5.484
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "no_signal",
+        "x": -480.0,
+        "y": -501.50635094610965,
+        "virtual_time_s": 672.61693,
+        "real_elapsed_s": 5.5
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 727.61693,
+        "real_elapsed_s": 6.062
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 733.61693,
+        "real_elapsed_s": 6.078
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 739.61693,
+        "real_elapsed_s": 6.109
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 745.61693,
+        "real_elapsed_s": 6.109
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 751.61693,
+        "real_elapsed_s": 6.14
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "no_signal",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 757.61693,
+        "real_elapsed_s": 6.156
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 763.61693,
+        "real_elapsed_s": 6.156
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -480.00000000000006,
+        "y": -751.5063509461097,
+        "virtual_time_s": 769.61693,
+        "real_elapsed_s": 6.187
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 811.64547,
+        "real_elapsed_s": 6.968
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "no_signal",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 817.64547,
+        "real_elapsed_s": 6.984
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 823.64547,
+        "real_elapsed_s": 7.0
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 829.64547,
+        "real_elapsed_s": 7.0
+      },
+      {
+        "kind": "measure",
+        "channel": 7,
+        "result": "direction",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 835.64547,
+        "real_elapsed_s": 7.031
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 841.64547,
+        "real_elapsed_s": 7.062
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 847.64547,
+        "real_elapsed_s": 7.078
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 853.64547,
+        "real_elapsed_s": 7.093
+      },
+      {
+        "kind": "clear",
+        "channel": 7,
+        "result": "success",
+        "x": -348.3333333333333,
+        "y": -881.6666666666666,
+        "virtual_time_s": 858.64547,
+        "real_elapsed_s": 7.125
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 914.64547,
+        "real_elapsed_s": 7.734
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "direction",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 920.64547,
+        "real_elapsed_s": 7.765
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 926.64547,
+        "real_elapsed_s": 7.812
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 932.64547,
+        "real_elapsed_s": 7.828
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 938.64547,
+        "real_elapsed_s": 7.828
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 944.64547,
+        "real_elapsed_s": 7.859
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -98.33333333333331,
+        "y": -881.6666666666666,
+        "virtual_time_s": 950.64547,
+        "real_elapsed_s": 7.89
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 976.44344,
+        "real_elapsed_s": 8.734
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 982.44344,
+        "real_elapsed_s": 8.765
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 988.44344,
+        "real_elapsed_s": 8.781
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 994.44344,
+        "real_elapsed_s": 8.797
+      },
+      {
+        "kind": "measure",
+        "channel": 6,
+        "result": "near",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 1000.44344,
+        "real_elapsed_s": 8.812
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 1006.44344,
+        "real_elapsed_s": 8.828
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 1012.44344,
+        "real_elapsed_s": 8.89
+      },
+      {
+        "kind": "clear",
+        "channel": 6,
+        "result": "success",
+        "x": 5.0,
+        "y": -870.0,
+        "virtual_time_s": 1017.44344,
+        "real_elapsed_s": 8.937
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1072.44344,
+        "real_elapsed_s": 9.531
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1078.44344,
+        "real_elapsed_s": 9.562
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "direction",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1084.44344,
+        "real_elapsed_s": 9.593
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1090.44344,
+        "real_elapsed_s": 9.625
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "no_signal",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1096.44344,
+        "real_elapsed_s": 9.64
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1102.44344,
+        "real_elapsed_s": 9.656
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": 255.0,
+        "y": -870.0,
+        "virtual_time_s": 1108.44344,
+        "real_elapsed_s": 9.718
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "no_signal",
+        "x": 475.0,
+        "y": -770.0,
+        "virtual_time_s": 1162.775624,
+        "real_elapsed_s": 10.468
+      },
+      {
+        "kind": "measure",
+        "channel": 4,
+        "result": "near",
+        "x": 475.0,
+        "y": -770.0,
+        "virtual_time_s": 1168.775624,
+        "real_elapsed_s": 10.484
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": 475.0,
+        "y": -770.0,
+        "virtual_time_s": 1174.775624,
+        "real_elapsed_s": 10.562
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 475.0,
+        "y": -770.0,
+        "virtual_time_s": 1180.775624,
+        "real_elapsed_s": 10.562
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 475.0,
+        "y": -770.0,
+        "virtual_time_s": 1186.775624,
+        "real_elapsed_s": 10.593
+      },
+      {
+        "kind": "clear",
+        "channel": 4,
+        "result": "success",
+        "x": 475.0,
+        "y": -770.0,
+        "virtual_time_s": 1191.775624,
+        "real_elapsed_s": 10.64
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "direction",
+        "x": 474.99999999999994,
+        "y": -1020.0,
+        "virtual_time_s": 1247.775624,
+        "real_elapsed_s": 11.031
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": 474.99999999999994,
+        "y": -1020.0,
+        "virtual_time_s": 1253.775624,
+        "real_elapsed_s": 11.062
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": 474.99999999999994,
+        "y": -1020.0,
+        "virtual_time_s": 1259.775624,
+        "real_elapsed_s": 11.062
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": 474.99999999999994,
+        "y": -1020.0,
+        "virtual_time_s": 1265.775624,
+        "real_elapsed_s": 11.078
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": 474.99999999999994,
+        "y": -1020.0,
+        "virtual_time_s": 1271.775624,
+        "real_elapsed_s": 11.14
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": 460.0,
+        "y": -1110.0,
+        "virtual_time_s": 1295.023912,
+        "real_elapsed_s": 11.765
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 460.0,
+        "y": -1110.0,
+        "virtual_time_s": 1301.023912,
+        "real_elapsed_s": 11.781
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 460.0,
+        "y": -1110.0,
+        "virtual_time_s": 1307.023912,
+        "real_elapsed_s": 11.781
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 460.0,
+        "y": -1110.0,
+        "virtual_time_s": 1313.023912,
+        "real_elapsed_s": 11.797
+      },
+      {
+        "kind": "measure",
+        "channel": 11,
+        "result": "near",
+        "x": 460.0,
+        "y": -1110.0,
+        "virtual_time_s": 1319.023912,
+        "real_elapsed_s": 11.906
+      },
+      {
+        "kind": "clear",
+        "channel": 11,
+        "result": "success",
+        "x": 460.0,
+        "y": -1110.0,
+        "virtual_time_s": 1324.023912,
+        "real_elapsed_s": 11.922
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": 243.49364905389035,
+        "y": -1235.0,
+        "virtual_time_s": 1380.023912,
+        "real_elapsed_s": 12.187
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": 26.987298107780703,
+        "y": -1360.0,
+        "virtual_time_s": 1435.023912,
+        "real_elapsed_s": 12.468
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 26.987298107780703,
+        "y": -1360.0,
+        "virtual_time_s": 1441.023912,
+        "real_elapsed_s": 12.468
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 26.987298107780703,
+        "y": -1360.0,
+        "virtual_time_s": 1447.023912,
+        "real_elapsed_s": 12.5
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 26.987298107780703,
+        "y": -1360.0,
+        "virtual_time_s": 1453.023912,
+        "real_elapsed_s": 12.515
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -223.0127018922193,
+        "y": -1360.0,
+        "virtual_time_s": 1509.023912,
+        "real_elapsed_s": 12.75
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": -223.0127018922193,
+        "y": -1360.0,
+        "virtual_time_s": 1515.023912,
+        "real_elapsed_s": 12.75
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -223.0127018922193,
+        "y": -1360.0,
+        "virtual_time_s": 1521.023912,
+        "real_elapsed_s": 12.781
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -223.0127018922193,
+        "y": -1360.0,
+        "virtual_time_s": 1527.023912,
+        "real_elapsed_s": 12.859
+      },
+      {
+        "kind": "measure",
+        "channel": 20,
+        "result": "direction",
+        "x": -450.0,
+        "y": -1440.0,
+        "virtual_time_s": 1580.158404,
+        "real_elapsed_s": 13.422
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -450.0,
+        "y": -1440.0,
+        "virtual_time_s": 1586.158404,
+        "real_elapsed_s": 13.422
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -450.0,
+        "y": -1440.0,
+        "virtual_time_s": 1592.158404,
+        "real_elapsed_s": 13.453
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -450.0,
+        "y": -1440.0,
+        "virtual_time_s": 1598.158404,
+        "real_elapsed_s": 13.453
+      },
+      {
+        "kind": "clear",
+        "channel": 20,
+        "result": "success",
+        "x": -450.0,
+        "y": -1440.0,
+        "virtual_time_s": 1603.158404,
+        "real_elapsed_s": 13.484
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 329.4228634059948,
+        "y": -990.0,
+        "virtual_time_s": 1789.158404,
+        "real_elapsed_s": 13.672
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 329.4228634059948,
+        "y": -990.0,
+        "virtual_time_s": 1795.158404,
+        "real_elapsed_s": 13.672
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "no_signal",
+        "x": 329.4228634059948,
+        "y": -990.0,
+        "virtual_time_s": 1801.158404,
+        "real_elapsed_s": 13.687
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": 329.4228634059948,
+        "y": -990.0,
+        "virtual_time_s": 1807.158404,
+        "real_elapsed_s": 13.703
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": 1108.8457268119896,
+        "y": -540.0,
+        "virtual_time_s": 1992.158404,
+        "real_elapsed_s": 13.875
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 1108.8457268119896,
+        "y": -540.0,
+        "virtual_time_s": 1998.158404,
+        "real_elapsed_s": 13.922
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 1108.8457268119896,
+        "y": -540.0,
+        "virtual_time_s": 2004.158404,
+        "real_elapsed_s": 13.937
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "no_signal",
+        "x": 1108.8457268119896,
+        "y": -540.0,
+        "virtual_time_s": 2010.158404,
+        "real_elapsed_s": 13.953
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 1325.3520777580993,
+        "y": -415.0,
+        "virtual_time_s": 2066.158404,
+        "real_elapsed_s": 14.093
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 1325.3520777580993,
+        "y": -415.0,
+        "virtual_time_s": 2072.158404,
+        "real_elapsed_s": 14.109
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 1325.3520777580993,
+        "y": -415.0,
+        "virtual_time_s": 2078.158404,
+        "real_elapsed_s": 14.14
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 1325.3520777580993,
+        "y": -415.0,
+        "virtual_time_s": 2084.158404,
+        "real_elapsed_s": 14.156
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 1430.0,
+        "y": -195.0,
+        "virtual_time_s": 2138.882602,
+        "real_elapsed_s": 14.562
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": 1430.0,
+        "y": -195.0,
+        "virtual_time_s": 2144.882602,
+        "real_elapsed_s": 14.578
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": 1430.0,
+        "y": -195.0,
+        "virtual_time_s": 2150.882602,
+        "real_elapsed_s": 14.593
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": 1430.0,
+        "y": -195.0,
+        "virtual_time_s": 2156.882602,
+        "real_elapsed_s": 14.609
+      },
+      {
+        "kind": "clear",
+        "channel": 3,
+        "result": "no_target_in_range",
+        "x": 1430.0,
+        "y": -195.0,
+        "virtual_time_s": 2159.882602,
+        "real_elapsed_s": 14.64
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "no_signal",
+        "x": 1418.6611652351683,
+        "y": -206.33883476483183,
+        "virtual_time_s": 2169.089709,
+        "real_elapsed_s": 15.015
+      },
+      {
+        "kind": "measure",
+        "channel": 3,
+        "result": "direction",
+        "x": 1418.6611652351683,
+        "y": -206.33883476483183,
+        "virtual_time_s": 2175.089709,
+        "real_elapsed_s": 15.078
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 1418.6611652351683,
+        "y": -206.33883476483183,
+        "virtual_time_s": 2181.089709,
+        "real_elapsed_s": 15.093
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 1418.6611652351683,
+        "y": -206.33883476483183,
+        "virtual_time_s": 2187.089709,
+        "real_elapsed_s": 15.093
+      },
+      {
+        "kind": "clear",
+        "channel": 3,
+        "result": "success",
+        "x": 1418.6611652351683,
+        "y": -206.33883476483183,
+        "virtual_time_s": 2192.089709,
+        "real_elapsed_s": 15.125
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2596.608841,
+        "real_elapsed_s": 15.14
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2602.608841,
+        "real_elapsed_s": 15.172
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2608.608841,
+        "real_elapsed_s": 15.203
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2614.608841,
+        "real_elapsed_s": 15.234
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2620.608841,
+        "real_elapsed_s": 15.234
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2626.608841,
+        "real_elapsed_s": 15.25
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "direction",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2632.608841,
+        "real_elapsed_s": 15.281
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2638.608841,
+        "real_elapsed_s": 15.312
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2644.608841,
+        "real_elapsed_s": 15.328
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2650.608841,
+        "real_elapsed_s": 15.359
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2656.608841,
+        "real_elapsed_s": 15.359
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": 1200.0,
+        "virtual_time_s": 2662.608841,
+        "real_elapsed_s": 15.39
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": 1.5308084989341916e-14,
+        "y": 1450.0,
+        "virtual_time_s": 2718.608841,
+        "real_elapsed_s": 16.047
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "direction",
+        "x": 1.5308084989341916e-14,
+        "y": 1450.0,
+        "virtual_time_s": 2724.608841,
+        "real_elapsed_s": 16.109
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 1.5308084989341916e-14,
+        "y": 1450.0,
+        "virtual_time_s": 2730.608841,
+        "real_elapsed_s": 16.14
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": -216.50635094610965,
+        "y": 1575.0,
+        "virtual_time_s": 2785.608841,
+        "real_elapsed_s": 16.75
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": -216.50635094610965,
+        "y": 1575.0,
+        "virtual_time_s": 2791.608841,
+        "real_elapsed_s": 16.828
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -216.50635094610965,
+        "y": 1575.0,
+        "virtual_time_s": 2797.608841,
+        "real_elapsed_s": 16.828
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -216.50635094610965,
+        "y": 1575.0,
+        "virtual_time_s": 2803.608841,
+        "real_elapsed_s": 16.843
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -216.50635094610965,
+        "y": 1575.0,
+        "virtual_time_s": 2809.608841,
+        "real_elapsed_s": 16.859
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "direction",
+        "x": -216.50635094610965,
+        "y": 1575.0,
+        "virtual_time_s": 2815.608841,
+        "real_elapsed_s": 16.953
+      },
+      {
+        "kind": "measure",
+        "channel": 12,
+        "result": "direction",
+        "x": -235.0,
+        "y": 1610.0,
+        "virtual_time_s": 2828.525949,
+        "real_elapsed_s": 17.672
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": -235.0,
+        "y": 1610.0,
+        "virtual_time_s": 2834.525949,
+        "real_elapsed_s": 17.734
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -235.0,
+        "y": 1610.0,
+        "virtual_time_s": 2840.525949,
+        "real_elapsed_s": 17.75
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -235.0,
+        "y": 1610.0,
+        "virtual_time_s": 2846.525949,
+        "real_elapsed_s": 17.765
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -235.0,
+        "y": 1610.0,
+        "virtual_time_s": 2852.525949,
+        "real_elapsed_s": 17.797
+      },
+      {
+        "kind": "clear",
+        "channel": 12,
+        "result": "success",
+        "x": -235.0,
+        "y": 1610.0,
+        "virtual_time_s": 2857.525949,
+        "real_elapsed_s": 17.828
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": -451.50635094610965,
+        "y": 1485.0,
+        "virtual_time_s": 2913.525949,
+        "real_elapsed_s": 18.203
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -451.50635094610965,
+        "y": 1485.0,
+        "virtual_time_s": 2919.525949,
+        "real_elapsed_s": 18.218
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -451.50635094610965,
+        "y": 1485.0,
+        "virtual_time_s": 2925.525949,
+        "real_elapsed_s": 18.234
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -451.50635094610965,
+        "y": 1485.0,
+        "virtual_time_s": 2931.525949,
+        "real_elapsed_s": 18.25
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": -550.8996645749882,
+        "y": 1485.0,
+        "virtual_time_s": 2957.404612,
+        "real_elapsed_s": 19.078
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -550.8996645749882,
+        "y": 1485.0,
+        "virtual_time_s": 2963.404612,
+        "real_elapsed_s": 19.093
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -550.8996645749882,
+        "y": 1485.0,
+        "virtual_time_s": 2969.404612,
+        "real_elapsed_s": 19.125
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -550.8996645749882,
+        "y": 1485.0,
+        "virtual_time_s": 2975.404612,
+        "real_elapsed_s": 19.125
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -550.8996645749882,
+        "y": 1485.0,
+        "virtual_time_s": 2981.404612,
+        "real_elapsed_s": 19.187
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -587.2446600928812,
+        "y": 1448.655004482107,
+        "virtual_time_s": 2996.684529,
+        "real_elapsed_s": 19.968
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": -587.2446600928812,
+        "y": 1448.655004482107,
+        "virtual_time_s": 3002.684529,
+        "real_elapsed_s": 20.093
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -587.2446600928812,
+        "y": 1448.655004482107,
+        "virtual_time_s": 3008.684529,
+        "real_elapsed_s": 20.109
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -587.2446600928812,
+        "y": 1448.655004482107,
+        "virtual_time_s": 3014.684529,
+        "real_elapsed_s": 20.109
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -587.2446600928812,
+        "y": 1448.655004482107,
+        "virtual_time_s": 3020.684529,
+        "real_elapsed_s": 20.14
+      },
+      {
+        "kind": "measure",
+        "channel": 1,
+        "result": "direction",
+        "x": -630.0,
+        "y": 1450.0,
+        "virtual_time_s": 3035.239827,
+        "real_elapsed_s": 20.984
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -630.0,
+        "y": 1450.0,
+        "virtual_time_s": 3041.239827,
+        "real_elapsed_s": 20.984
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -630.0,
+        "y": 1450.0,
+        "virtual_time_s": 3047.239827,
+        "real_elapsed_s": 21.047
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -630.0,
+        "y": 1450.0,
+        "virtual_time_s": 3053.239827,
+        "real_elapsed_s": 21.078
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -630.0,
+        "y": 1450.0,
+        "virtual_time_s": 3059.239827,
+        "real_elapsed_s": 21.093
+      },
+      {
+        "kind": "clear",
+        "channel": 1,
+        "result": "success",
+        "x": -630.0,
+        "y": 1450.0,
+        "virtual_time_s": 3064.239827,
+        "real_elapsed_s": 21.125
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -846.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3120.239827,
+        "real_elapsed_s": 21.5
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -846.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3126.239827,
+        "real_elapsed_s": 21.531
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -846.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3132.239827,
+        "real_elapsed_s": 21.547
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -846.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3138.239827,
+        "real_elapsed_s": 21.64
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -1096.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3193.239827,
+        "real_elapsed_s": 22.125
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -1096.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3199.239827,
+        "real_elapsed_s": 22.125
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -1096.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3205.239827,
+        "real_elapsed_s": 22.125
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -1096.5063509461097,
+        "y": 1325.0,
+        "virtual_time_s": 3211.239827,
+        "real_elapsed_s": 22.156
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -1156.843751845055,
+        "y": 1325.0,
+        "virtual_time_s": 3229.307307,
+        "real_elapsed_s": 22.703
+      },
+      {
+        "kind": "measure",
+        "channel": 17,
+        "result": "direction",
+        "x": -1156.843751845055,
+        "y": 1325.0,
+        "virtual_time_s": 3235.307307,
+        "real_elapsed_s": 22.843
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -1156.843751845055,
+        "y": 1325.0,
+        "virtual_time_s": 3241.307307,
+        "real_elapsed_s": 22.859
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -1156.843751845055,
+        "y": 1325.0,
+        "virtual_time_s": 3247.307307,
+        "real_elapsed_s": 22.859
+      },
+      {
+        "kind": "clear",
+        "channel": 17,
+        "result": "success",
+        "x": -1156.843751845055,
+        "y": 1325.0,
+        "virtual_time_s": 3252.307307,
+        "real_elapsed_s": 22.906
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -723.8310499528359,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3358.307307,
+        "real_elapsed_s": 23.093
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -723.8310499528359,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3364.307307,
+        "real_elapsed_s": 23.109
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": -723.8310499528359,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3370.307307,
+        "real_elapsed_s": 23.172
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -723.8310499528359,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3376.307307,
+        "real_elapsed_s": 23.187
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": -473.8310499528359,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3432.307307,
+        "real_elapsed_s": 23.453
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "no_signal",
+        "x": -223.83104995283588,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3487.307307,
+        "real_elapsed_s": 23.734
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 26.168950047164117,
+        "y": 1074.9999999999998,
+        "virtual_time_s": 3542.307307,
+        "real_elapsed_s": 24.0
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 242.6753009932738,
+        "y": 1199.9999999999998,
+        "virtual_time_s": 3597.307307,
+        "real_elapsed_s": 24.25
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 242.6753009932738,
+        "y": 1199.9999999999998,
+        "virtual_time_s": 3603.307307,
+        "real_elapsed_s": 24.265
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 242.6753009932738,
+        "y": 1199.9999999999998,
+        "virtual_time_s": 3609.307307,
+        "real_elapsed_s": 24.297
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 242.6753009932738,
+        "y": 1199.9999999999998,
+        "virtual_time_s": 3615.307307,
+        "real_elapsed_s": 24.328
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 459.18165193938347,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3671.307307,
+        "real_elapsed_s": 24.5
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 459.18165193938347,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3677.307307,
+        "real_elapsed_s": 24.625
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 459.18165193938347,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3683.307307,
+        "real_elapsed_s": 24.64
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 459.18165193938347,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3689.307307,
+        "real_elapsed_s": 24.656
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 709.1816519393835,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3745.307307,
+        "real_elapsed_s": 24.828
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 709.1816519393835,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3751.307307,
+        "real_elapsed_s": 24.984
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": 709.1816519393835,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3757.307307,
+        "real_elapsed_s": 25.0
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": 709.1816519393835,
+        "y": 1324.9999999999998,
+        "virtual_time_s": 3763.307307,
+        "real_elapsed_s": 25.015
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 840.0,
+        "y": 1370.0,
+        "virtual_time_s": 3796.975657,
+        "real_elapsed_s": 25.39
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 840.0,
+        "y": 1370.0,
+        "virtual_time_s": 3802.975657,
+        "real_elapsed_s": 25.39
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 840.0,
+        "y": 1370.0,
+        "virtual_time_s": 3808.975657,
+        "real_elapsed_s": 25.39
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 840.0,
+        "y": 1370.0,
+        "virtual_time_s": 3814.975657,
+        "real_elapsed_s": 25.578
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "direction",
+        "x": 869.0306314738966,
+        "y": 1370.0,
+        "virtual_time_s": 3825.781783,
+        "real_elapsed_s": 26.14
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 869.0306314738966,
+        "y": 1370.0,
+        "virtual_time_s": 3831.781783,
+        "real_elapsed_s": 26.156
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 869.0306314738966,
+        "y": 1370.0,
+        "virtual_time_s": 3837.781783,
+        "real_elapsed_s": 26.156
+      },
+      {
+        "kind": "clear",
+        "channel": 13,
+        "result": "no_target_in_range",
+        "x": 869.0306314738966,
+        "y": 1370.0,
+        "virtual_time_s": 3840.781783,
+        "real_elapsed_s": 26.172
+      },
+      {
+        "kind": "measure",
+        "channel": 13,
+        "result": "near",
+        "x": 845.0,
+        "y": 1370.0,
+        "virtual_time_s": 3851.587909,
+        "real_elapsed_s": 26.734
+      },
+      {
+        "kind": "clear",
+        "channel": 13,
+        "result": "success",
+        "x": 845.0,
+        "y": 1370.0,
+        "virtual_time_s": 3856.587909,
+        "real_elapsed_s": 26.75
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4345.84457,
+        "real_elapsed_s": 26.984
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4351.84457,
+        "real_elapsed_s": 27.0
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4357.84457,
+        "real_elapsed_s": 27.015
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4363.84457,
+        "real_elapsed_s": 27.031
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4369.84457,
+        "real_elapsed_s": 27.047
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4375.84457,
+        "real_elapsed_s": 27.062
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4381.84457,
+        "real_elapsed_s": 27.078
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -1110.0,
+        "y": -50.0,
+        "virtual_time_s": 4387.84457,
+        "real_elapsed_s": 27.093
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4623.547843,
+        "real_elapsed_s": 27.156
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4629.547843,
+        "real_elapsed_s": 27.156
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4635.547843,
+        "real_elapsed_s": 27.172
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4641.547843,
+        "real_elapsed_s": 27.203
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4647.547843,
+        "real_elapsed_s": 27.218
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4653.547843,
+        "real_elapsed_s": 27.218
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4659.547843,
+        "real_elapsed_s": 27.25
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": -1200.0,
+        "y": -1200.0,
+        "virtual_time_s": 4665.547843,
+        "real_elapsed_s": 27.265
+      },
+      {
+        "kind": "measure",
+        "channel": 18,
+        "result": "no_signal",
+        "x": 1200.0,
+        "y": 0.0,
+        "virtual_time_s": 5207.204158,
+        "real_elapsed_s": 27.328
+      },
+      {
+        "kind": "measure",
+        "channel": 2,
+        "result": "no_signal",
+        "x": 1200.0,
+        "y": 0.0,
+        "virtual_time_s": 5213.204158,
+        "real_elapsed_s": 27.343
+      },
+      {
+        "kind": "measure",
+        "channel": 5,
+        "result": "no_signal",
+        "x": 1200.0,
+        "y": 0.0,
+        "virtual_time_s": 5219.204158,
+        "real_elapsed_s": 27.359
+      },
+      {
+        "kind": "measure",
+        "channel": 8,
+        "result": "no_signal",
+        "x": 1200.0,
+        "y": 0.0,
+        "virtual_time_s": 5225.204158,
+        "real_elapsed_s": 27.375
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 1200.0,
+        "y": 0.0,
+        "virtual_time_s": 5231.204158,
+        "real_elapsed_s": 27.39
+      },
+      {
+        "kind": "measure",
+        "channel": 15,
+        "result": "no_signal",
+        "x": 1200.0,
+        "y": 0.0,
+        "virtual_time_s": 5237.204158,
+        "real_elapsed_s": 27.406
+      },
+      {
+        "kind": "measure",
+        "channel": 10,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": -1200.0,
+        "virtual_time_s": 5582.615413,
+        "real_elapsed_s": 27.437
+      },
+      {
+        "kind": "measure",
+        "channel": 14,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": -1200.0,
+        "virtual_time_s": 5588.615413,
+        "real_elapsed_s": 27.453
+      },
+      {
+        "kind": "measure",
+        "channel": 19,
+        "result": "no_signal",
+        "x": 0.0,
+        "y": -1200.0,
+        "virtual_time_s": 5594.615413,
+        "real_elapsed_s": 27.468
+      }
+    ],
+    "trajectory": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000011,
+        -216.50635094610962
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -125.00000000000016,
+        -466.5063509461096
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -185.0,
+        -415.0
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -435.0,
+        -414.99999999999994
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -605.0,
+        -285.0
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.0,
+        -501.50635094610965
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -480.00000000000006,
+        -751.5063509461097
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -348.3333333333333,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        -98.33333333333331,
+        -881.6666666666666
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        5.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        255.0,
+        -870.0
+      ],
+      [
+        475.0,
+        -770.0
+      ],
+      [
+        475.0,
+        -770.0
+      ],
+      [
+        475.0,
+        -770.0
+      ],
+      [
+        475.0,
+        -770.0
+      ],
+      [
+        475.0,
+        -770.0
+      ],
+      [
+        475.0,
+        -770.0
+      ],
+      [
+        474.99999999999994,
+        -1020.0
+      ],
+      [
+        474.99999999999994,
+        -1020.0
+      ],
+      [
+        474.99999999999994,
+        -1020.0
+      ],
+      [
+        474.99999999999994,
+        -1020.0
+      ],
+      [
+        474.99999999999994,
+        -1020.0
+      ],
+      [
+        460.0,
+        -1110.0
+      ],
+      [
+        460.0,
+        -1110.0
+      ],
+      [
+        460.0,
+        -1110.0
+      ],
+      [
+        460.0,
+        -1110.0
+      ],
+      [
+        460.0,
+        -1110.0
+      ],
+      [
+        460.0,
+        -1110.0
+      ],
+      [
+        243.49364905389035,
+        -1235.0
+      ],
+      [
+        26.987298107780703,
+        -1360.0
+      ],
+      [
+        26.987298107780703,
+        -1360.0
+      ],
+      [
+        26.987298107780703,
+        -1360.0
+      ],
+      [
+        26.987298107780703,
+        -1360.0
+      ],
+      [
+        -223.0127018922193,
+        -1360.0
+      ],
+      [
+        -223.0127018922193,
+        -1360.0
+      ],
+      [
+        -223.0127018922193,
+        -1360.0
+      ],
+      [
+        -223.0127018922193,
+        -1360.0
+      ],
+      [
+        -450.0,
+        -1440.0
+      ],
+      [
+        -450.0,
+        -1440.0
+      ],
+      [
+        -450.0,
+        -1440.0
+      ],
+      [
+        -450.0,
+        -1440.0
+      ],
+      [
+        -450.0,
+        -1440.0
+      ],
+      [
+        329.4228634059948,
+        -990.0
+      ],
+      [
+        329.4228634059948,
+        -990.0
+      ],
+      [
+        329.4228634059948,
+        -990.0
+      ],
+      [
+        329.4228634059948,
+        -990.0
+      ],
+      [
+        1108.8457268119896,
+        -540.0
+      ],
+      [
+        1108.8457268119896,
+        -540.0
+      ],
+      [
+        1108.8457268119896,
+        -540.0
+      ],
+      [
+        1108.8457268119896,
+        -540.0
+      ],
+      [
+        1325.3520777580993,
+        -415.0
+      ],
+      [
+        1325.3520777580993,
+        -415.0
+      ],
+      [
+        1325.3520777580993,
+        -415.0
+      ],
+      [
+        1325.3520777580993,
+        -415.0
+      ],
+      [
+        1430.0,
+        -195.0
+      ],
+      [
+        1430.0,
+        -195.0
+      ],
+      [
+        1430.0,
+        -195.0
+      ],
+      [
+        1430.0,
+        -195.0
+      ],
+      [
+        1430.0,
+        -195.0
+      ],
+      [
+        1418.6611652351683,
+        -206.33883476483183
+      ],
+      [
+        1418.6611652351683,
+        -206.33883476483183
+      ],
+      [
+        1418.6611652351683,
+        -206.33883476483183
+      ],
+      [
+        1418.6611652351683,
+        -206.33883476483183
+      ],
+      [
+        1418.6611652351683,
+        -206.33883476483183
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        0.0,
+        1200.0
+      ],
+      [
+        1.5308084989341916e-14,
+        1450.0
+      ],
+      [
+        1.5308084989341916e-14,
+        1450.0
+      ],
+      [
+        1.5308084989341916e-14,
+        1450.0
+      ],
+      [
+        -216.50635094610965,
+        1575.0
+      ],
+      [
+        -216.50635094610965,
+        1575.0
+      ],
+      [
+        -216.50635094610965,
+        1575.0
+      ],
+      [
+        -216.50635094610965,
+        1575.0
+      ],
+      [
+        -216.50635094610965,
+        1575.0
+      ],
+      [
+        -216.50635094610965,
+        1575.0
+      ],
+      [
+        -235.0,
+        1610.0
+      ],
+      [
+        -235.0,
+        1610.0
+      ],
+      [
+        -235.0,
+        1610.0
+      ],
+      [
+        -235.0,
+        1610.0
+      ],
+      [
+        -235.0,
+        1610.0
+      ],
+      [
+        -235.0,
+        1610.0
+      ],
+      [
+        -451.50635094610965,
+        1485.0
+      ],
+      [
+        -451.50635094610965,
+        1485.0
+      ],
+      [
+        -451.50635094610965,
+        1485.0
+      ],
+      [
+        -451.50635094610965,
+        1485.0
+      ],
+      [
+        -550.8996645749882,
+        1485.0
+      ],
+      [
+        -550.8996645749882,
+        1485.0
+      ],
+      [
+        -550.8996645749882,
+        1485.0
+      ],
+      [
+        -550.8996645749882,
+        1485.0
+      ],
+      [
+        -550.8996645749882,
+        1485.0
+      ],
+      [
+        -587.2446600928812,
+        1448.655004482107
+      ],
+      [
+        -587.2446600928812,
+        1448.655004482107
+      ],
+      [
+        -587.2446600928812,
+        1448.655004482107
+      ],
+      [
+        -587.2446600928812,
+        1448.655004482107
+      ],
+      [
+        -587.2446600928812,
+        1448.655004482107
+      ],
+      [
+        -630.0,
+        1450.0
+      ],
+      [
+        -630.0,
+        1450.0
+      ],
+      [
+        -630.0,
+        1450.0
+      ],
+      [
+        -630.0,
+        1450.0
+      ],
+      [
+        -630.0,
+        1450.0
+      ],
+      [
+        -630.0,
+        1450.0
+      ],
+      [
+        -846.5063509461097,
+        1325.0
+      ],
+      [
+        -846.5063509461097,
+        1325.0
+      ],
+      [
+        -846.5063509461097,
+        1325.0
+      ],
+      [
+        -846.5063509461097,
+        1325.0
+      ],
+      [
+        -1096.5063509461097,
+        1325.0
+      ],
+      [
+        -1096.5063509461097,
+        1325.0
+      ],
+      [
+        -1096.5063509461097,
+        1325.0
+      ],
+      [
+        -1096.5063509461097,
+        1325.0
+      ],
+      [
+        -1156.843751845055,
+        1325.0
+      ],
+      [
+        -1156.843751845055,
+        1325.0
+      ],
+      [
+        -1156.843751845055,
+        1325.0
+      ],
+      [
+        -1156.843751845055,
+        1325.0
+      ],
+      [
+        -1156.843751845055,
+        1325.0
+      ],
+      [
+        -723.8310499528359,
+        1074.9999999999998
+      ],
+      [
+        -723.8310499528359,
+        1074.9999999999998
+      ],
+      [
+        -723.8310499528359,
+        1074.9999999999998
+      ],
+      [
+        -723.8310499528359,
+        1074.9999999999998
+      ],
+      [
+        -473.8310499528359,
+        1074.9999999999998
+      ],
+      [
+        -223.83104995283588,
+        1074.9999999999998
+      ],
+      [
+        26.168950047164117,
+        1074.9999999999998
+      ],
+      [
+        242.6753009932738,
+        1199.9999999999998
+      ],
+      [
+        242.6753009932738,
+        1199.9999999999998
+      ],
+      [
+        242.6753009932738,
+        1199.9999999999998
+      ],
+      [
+        242.6753009932738,
+        1199.9999999999998
+      ],
+      [
+        459.18165193938347,
+        1324.9999999999998
+      ],
+      [
+        459.18165193938347,
+        1324.9999999999998
+      ],
+      [
+        459.18165193938347,
+        1324.9999999999998
+      ],
+      [
+        459.18165193938347,
+        1324.9999999999998
+      ],
+      [
+        709.1816519393835,
+        1324.9999999999998
+      ],
+      [
+        709.1816519393835,
+        1324.9999999999998
+      ],
+      [
+        709.1816519393835,
+        1324.9999999999998
+      ],
+      [
+        709.1816519393835,
+        1324.9999999999998
+      ],
+      [
+        840.0,
+        1370.0
+      ],
+      [
+        840.0,
+        1370.0
+      ],
+      [
+        840.0,
+        1370.0
+      ],
+      [
+        840.0,
+        1370.0
+      ],
+      [
+        869.0306314738966,
+        1370.0
+      ],
+      [
+        869.0306314738966,
+        1370.0
+      ],
+      [
+        869.0306314738966,
+        1370.0
+      ],
+      [
+        869.0306314738966,
+        1370.0
+      ],
+      [
+        845.0,
+        1370.0
+      ],
+      [
+        845.0,
+        1370.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1110.0,
+        -50.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        -1200.0,
+        -1200.0
+      ],
+      [
+        1200.0,
+        0.0
+      ],
+      [
+        1200.0,
+        0.0
+      ],
+      [
+        1200.0,
+        0.0
+      ],
+      [
+        1200.0,
+        0.0
+      ],
+      [
+        1200.0,
+        0.0
+      ],
+      [
+        1200.0,
+        0.0
+      ],
+      [
+        0.0,
+        -1200.0
+      ],
+      [
+        0.0,
+        -1200.0
+      ],
+      [
+        0.0,
+        -1200.0
+      ]
+    ],
+    "channel_series": {
+      "1": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2066.738502610693,
+          "area_m2": 6696200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2485.0238518656697,
+          "area_m2": 5768700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2764.3654340742382,
+          "area_m2": 4900300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 2721.242212010403,
+          "area_m2": 3872300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3250.042570698648,
+          "area_m2": 2911300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 985.6925472409653,
+          "area_m2": 30200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 697.3608620287582,
+          "area_m2": 3900.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 455.55935502799497,
+          "area_m2": 1700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 442.53059520792556,
+          "area_m2": 1500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 198.78662725775703,
+          "area_m2": 1200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 102.7991711715875,
+          "area_m2": 700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 59.84355024029398,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 17.071067811865476,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "2": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2066.738502610693,
+          "area_m2": 6696200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2509.5830355455955,
+          "area_m2": 5798600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2687.0757319869113,
+          "area_m2": 4908800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3017.934731281203,
+          "area_m2": 4439800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3177.1859417965857,
+          "area_m2": 4387800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 3325.0975897070716,
+          "area_m2": 4316400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3205.226992569246,
+          "area_m2": 3355200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 2733.90072879181,
+          "area_m2": 1666800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 2968.8074195742724,
+          "area_m2": 1594700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 2765.983241045886,
+          "area_m2": 1365000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 2709.1073369984947,
+          "area_m2": 1301500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 2963.926370148727,
+          "area_m2": 1041000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 2866.0887565457674,
+          "area_m2": 817000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 15,
+          "limit_m": 3371.250016678884,
+          "area_m2": 581600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 16,
+          "limit_m": 2907.77787822894,
+          "area_m2": 52000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 17,
+          "limit_m": 3457.7521600022174,
+          "area_m2": 36900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 18,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "3": [
+        {
+          "measure_count": 1,
+          "limit_m": 1513.2251103984795,
+          "area_m2": 61000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 1622.7405391698912,
+          "area_m2": 35300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 1426.6572751272226,
+          "area_m2": 5400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 1428.1056521850749,
+          "area_m2": 5000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 524.1130477728354,
+          "area_m2": 2300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 277.5690272762298,
+          "area_m2": 1100.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 32.071067811865476,
+          "area_m2": 500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 32.071067811865476,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 16.47425419256065,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "4": [
+        {
+          "measure_count": 1,
+          "limit_m": 1513.3910869313088,
+          "area_m2": 61700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 996.2063307041572,
+          "area_m2": 7800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 751.3712491375422,
+          "area_m2": 3600.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 828.8070351395711,
+          "area_m2": 3600.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 1049.7838758275723,
+          "area_m2": 3100.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 1050.6698693278058,
+          "area_m2": 2700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 1007.8116740717915,
+          "area_m2": 2300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 862.7222168725609,
+          "area_m2": 1800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 615.7353613450266,
+          "area_m2": 1400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 512.0710678118655,
+          "area_m2": 1200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 266.54168271844793,
+          "area_m2": 900.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 18.251407699364425,
+          "area_m2": 500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "5": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2066.738502610693,
+          "area_m2": 6696200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2509.5830355455955,
+          "area_m2": 5798600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2687.0757319869113,
+          "area_m2": 4908800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3017.934731281203,
+          "area_m2": 4439800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3177.1859417965857,
+          "area_m2": 4387800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 3325.0975897070716,
+          "area_m2": 4316400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3205.226992569246,
+          "area_m2": 3355200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 2733.90072879181,
+          "area_m2": 1666800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 2968.8074195742724,
+          "area_m2": 1594700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 2765.983241045886,
+          "area_m2": 1365000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 2725.0188420497293,
+          "area_m2": 1118100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 3021.856088771691,
+          "area_m2": 1029200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 2866.0887565457674,
+          "area_m2": 805200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 15,
+          "limit_m": 3371.250016678884,
+          "area_m2": 569800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 16,
+          "limit_m": 2907.77787822894,
+          "area_m2": 52000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 17,
+          "limit_m": 3457.7521600022174,
+          "area_m2": 36900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 18,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "6": [
+        {
+          "measure_count": 1,
+          "limit_m": 1507.604306364081,
+          "area_m2": 60900.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 864.6878446966507,
+          "area_m2": 8600.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 562.6252718107512,
+          "area_m2": 4500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 602.2601134099846,
+          "area_m2": 3600.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 664.832422711954,
+          "area_m2": 1500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 876.9273777849553,
+          "area_m2": 1000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 640.2592826068087,
+          "area_m2": 1000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 525.8971377315083,
+          "area_m2": 700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 375.40817186496275,
+          "area_m2": 400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 116.03079533640647,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 12.071067811865476,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "7": [
+        {
+          "measure_count": 1,
+          "limit_m": 1513.3910869313088,
+          "area_m2": 61000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 1267.409153538061,
+          "area_m2": 27800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 629.630478264387,
+          "area_m2": 6100.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 652.555382106179,
+          "area_m2": 4700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 517.609998746618,
+          "area_m2": 1300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 672.8412984470299,
+          "area_m2": 1000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 426.2335522212949,
+          "area_m2": 800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 203.99869621443915,
+          "area_m2": 500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 15.569433667853492,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "8": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2299.477097245665,
+          "area_m2": 6241700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2509.5830355455955,
+          "area_m2": 5607700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2687.0757319869113,
+          "area_m2": 4908800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3017.934731281203,
+          "area_m2": 4439800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3177.1859417965857,
+          "area_m2": 4387800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 3325.0975897070716,
+          "area_m2": 4316400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3205.226992569246,
+          "area_m2": 3355200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 2733.90072879181,
+          "area_m2": 1666800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 2968.8074195742724,
+          "area_m2": 1594700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 2765.983241045886,
+          "area_m2": 1365000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 2725.0188420497293,
+          "area_m2": 1118100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 2539.3997279015653,
+          "area_m2": 1037400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 3094.591337366068,
+          "area_m2": 705000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 15,
+          "limit_m": 3371.250016678884,
+          "area_m2": 578000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 16,
+          "limit_m": 2907.77787822894,
+          "area_m2": 52000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 17,
+          "limit_m": 3457.7521600022174,
+          "area_m2": 36900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 18,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "9": [
+        {
+          "measure_count": 1,
+          "limit_m": 1510.8330170578224,
+          "area_m2": 60400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 579.754280778172,
+          "area_m2": 3800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 560.9478518751723,
+          "area_m2": 1500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 488.57911551200516,
+          "area_m2": 1500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 236.0907176238412,
+          "area_m2": 700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 14.142135623730951,
+          "area_m2": 400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "10": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2299.477097245665,
+          "area_m2": 6241700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2708.163690515936,
+          "area_m2": 5402600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2722.9917220284055,
+          "area_m2": 4568200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 2859.7020943482516,
+          "area_m2": 4492100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3049.1273886062413,
+          "area_m2": 3599500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 3008.354126771816,
+          "area_m2": 1911100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3407.162978334285,
+          "area_m2": 1839000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 3262.217040823875,
+          "area_m2": 1566900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 3176.8052364291834,
+          "area_m2": 1360300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 2909.374332961865,
+          "area_m2": 1249000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 3040.3429901008194,
+          "area_m2": 1023600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 3296.844727994539,
+          "area_m2": 776200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 2926.9512023379384,
+          "area_m2": 173200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 15,
+          "limit_m": 3475.1685289568086,
+          "area_m2": 163500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 16,
+          "limit_m": 2373.0381005492195,
+          "area_m2": 3500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 17,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "11": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 1513.1664278413261,
+          "area_m2": 44400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 1513.8059482735875,
+          "area_m2": 38000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 1696.5236418724694,
+          "area_m2": 35200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 1678.175363539979,
+          "area_m2": 34700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 1144.9536101951276,
+          "area_m2": 5100.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 913.0174728982197,
+          "area_m2": 2500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 677.1995795334772,
+          "area_m2": 2500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 588.5562352925158,
+          "area_m2": 2300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 371.6598772945483,
+          "area_m2": 1400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 357.3923489239327,
+          "area_m2": 700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 108.18980989264888,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 17.071067811865476,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "12": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2270.8400489581304,
+          "area_m2": 6297100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2708.163690515936,
+          "area_m2": 5469800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2722.9917220284055,
+          "area_m2": 4565300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 2859.7020943482516,
+          "area_m2": 4489200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3049.1273886062413,
+          "area_m2": 3596600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 670.7728080536701,
+          "area_m2": 17200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 323.29883382870344,
+          "area_m2": 1600.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 71.46691027817047,
+          "area_m2": 700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 32.071067811865476,
+          "area_m2": 500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "13": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2270.8400489581304,
+          "area_m2": 6297100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2708.163690515936,
+          "area_m2": 5469800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2722.9917220284055,
+          "area_m2": 4565300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 2859.7020943482516,
+          "area_m2": 4489200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3049.1273886062413,
+          "area_m2": 3596600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 1148.4737136822876,
+          "area_m2": 37900.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 959.6465241406543,
+          "area_m2": 6100.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 1179.9018057185278,
+          "area_m2": 5400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 1698.6261992773334,
+          "area_m2": 5400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 1453.426223992649,
+          "area_m2": 5400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 1210.2035263692433,
+          "area_m2": 5400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 970.4568616960719,
+          "area_m2": 3000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 707.9053905191315,
+          "area_m2": 2700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 15,
+          "limit_m": 471.16001393029603,
+          "area_m2": 2500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 16,
+          "limit_m": 196.06914980046733,
+          "area_m2": 1700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 17,
+          "limit_m": 58.061262947793324,
+          "area_m2": 800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 18,
+          "limit_m": 36.101699285762095,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 18,
+          "limit_m": 36.101699285762095,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 19,
+          "limit_m": 12.071067811865476,
+          "area_m2": 200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 19,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "14": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2270.8400489581304,
+          "area_m2": 6297100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2764.3654340742382,
+          "area_m2": 5447700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2721.242212010403,
+          "area_m2": 4431100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3250.042570698648,
+          "area_m2": 3470100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3013.0817131689305,
+          "area_m2": 1781700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 3443.453613454885,
+          "area_m2": 1709600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3365.0551918294354,
+          "area_m2": 1437500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 3431.931047046823,
+          "area_m2": 1153900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 3055.1018035231905,
+          "area_m2": 1093600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 3161.404894527329,
+          "area_m2": 822200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 3415.764485695712,
+          "area_m2": 766800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 2281.7358782839488,
+          "area_m2": 45400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 1692.8053291947206,
+          "area_m2": 15400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 15,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "15": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2416.7287198446184,
+          "area_m2": 6015800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2704.1940205565525,
+          "area_m2": 5068000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2941.42363694871,
+          "area_m2": 4416300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3193.9472015711162,
+          "area_m2": 4336500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3259.9351903967604,
+          "area_m2": 3255200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 2815.8608427861336,
+          "area_m2": 1566800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3107.6879419193388,
+          "area_m2": 1494700.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 2856.86105202376,
+          "area_m2": 1222600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 2787.5138170425466,
+          "area_m2": 950400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 3288.9557163300865,
+          "area_m2": 634300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 2870.0240887327463,
+          "area_m2": 61100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 3475.1685289568086,
+          "area_m2": 3600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "16": [
+        {
+          "measure_count": 1,
+          "limit_m": 1511.8634122899998,
+          "area_m2": 61000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 530.6749081878927,
+          "area_m2": 6500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 93.19869228418493,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 14.142135623730951,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "17": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2416.7287198446184,
+          "area_m2": 6015800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2704.1940205565525,
+          "area_m2": 5068000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2941.42363694871,
+          "area_m2": 4416300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3193.9472015711162,
+          "area_m2": 4336500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3259.9351903967604,
+          "area_m2": 3255200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 2815.8608427861336,
+          "area_m2": 1566800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 850.8464250850873,
+          "area_m2": 10500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 754.8212215452932,
+          "area_m2": 9400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 698.2809909327364,
+          "area_m2": 8500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 657.0710678118655,
+          "area_m2": 8200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 370.599103735524,
+          "area_m2": 2600.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 120.67480179789084,
+          "area_m2": 1400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 22.399534872064066,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ],
+      "18": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2416.7287198446184,
+          "area_m2": 6015800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2704.1940205565525,
+          "area_m2": 5068000.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2941.42363694871,
+          "area_m2": 4416300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3193.9472015711162,
+          "area_m2": 4336500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3259.9351903967604,
+          "area_m2": 3255200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 2815.8608427861336,
+          "area_m2": 1566800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 2925.0853735746323,
+          "area_m2": 1321600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 2848.989433986376,
+          "area_m2": 1201500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 2846.7053923680787,
+          "area_m2": 938300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 3288.9557163300865,
+          "area_m2": 622200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 2870.0240887327463,
+          "area_m2": 61100.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 3475.1685289568086,
+          "area_m2": 3600.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "19": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 2485.0238518656697,
+          "area_m2": 5888800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 2764.3654340742382,
+          "area_m2": 4907900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 2721.242212010403,
+          "area_m2": 3872300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 3250.042570698648,
+          "area_m2": 2911300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 3013.0817131689305,
+          "area_m2": 1229200.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 3364.1378953630824,
+          "area_m2": 994500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 3378.7768675518128,
+          "area_m2": 896300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 3458.1979623998177,
+          "area_m2": 697300.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 3161.404894527329,
+          "area_m2": 425900.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 3415.764485695712,
+          "area_m2": 370500.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 2281.7358782839488,
+          "area_m2": 45400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 1692.8053291947206,
+          "area_m2": 15400.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "unknown"
+        }
+      ],
+      "20": [
+        {
+          "measure_count": 1,
+          "limit_m": 1817.0710678118655,
+          "area_m2": 7190800.0,
+          "status": "unknown"
+        },
+        {
+          "measure_count": 2,
+          "limit_m": 1512.1458167861483,
+          "area_m2": 46400.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 3,
+          "limit_m": 1236.581802114638,
+          "area_m2": 18700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 4,
+          "limit_m": 986.8413578486668,
+          "area_m2": 14800.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 5,
+          "limit_m": 653.4498697195052,
+          "area_m2": 4300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 6,
+          "limit_m": 706.2173726405156,
+          "area_m2": 2100.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 7,
+          "limit_m": 774.0945355102144,
+          "area_m2": 1900.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 8,
+          "limit_m": 940.46541105592,
+          "area_m2": 1700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 9,
+          "limit_m": 1044.7246708991386,
+          "area_m2": 1500.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 10,
+          "limit_m": 991.3982491900899,
+          "area_m2": 1300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 11,
+          "limit_m": 745.6699537162231,
+          "area_m2": 1200.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 12,
+          "limit_m": 504.219565263398,
+          "area_m2": 1000.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 13,
+          "limit_m": 260.5725065936328,
+          "area_m2": 700.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": 21.213203435596427,
+          "area_m2": 300.0,
+          "status": "detected"
+        },
+        {
+          "measure_count": 14,
+          "limit_m": null,
+          "area_m2": 0.0,
+          "status": "cleared"
+        }
+      ]
+    },
+    "exclusion_certificates": {
+      "2": {
+        "no_signal_stations": 18,
+        "covering_radius_m": 921.893,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "5": {
+        "no_signal_stations": 18,
+        "covering_radius_m": 921.893,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "8": {
+        "no_signal_stations": 18,
+        "covering_radius_m": 960.403,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "10": {
+        "no_signal_stations": 17,
+        "covering_radius_m": 960.403,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "14": {
+        "no_signal_stations": 15,
+        "covering_radius_m": 982.929,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "15": {
+        "no_signal_stations": 14,
+        "covering_radius_m": 959.199,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "18": {
+        "no_signal_stations": 14,
+        "covering_radius_m": 959.199,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      },
+      "19": {
+        "no_signal_stations": 14,
+        "covering_radius_m": 982.929,
+        "receive_radius_lower_bound_m": 1000.0,
+        "certified": true
+      }
+    },
+    "tracking_states": {},
+    "config": {
+      "lattice_spacing_m": 10.0,
+      "planning_spacing_m": 50.0,
+      "candidate_spacing_m": 1200.0,
+      "candidate_radius_m": 1500.0,
+      "candidate_layout": "grid9",
+      "lookahead_directions": 12,
+      "lookahead_lengths_m": [
+        250.0,
+        500.0,
+        900.0
+      ],
+      "lookahead_hypotheses": 10,
+      "chase_options_limit": 4,
+      "local_lookahead_limit_m": 300.0,
+      "approach_direct_m": 400.0,
+      "search_channels_per_stop": 3,
+      "search_min_gain_m2": 50000.0,
+      "fill_search_stops": true,
+      "endgame_seconds": 60.0,
+      "search_risk_premium": 1.25,
+      "speculative_clear_m": 45.0,
+      "speculative_min_probability": 0.3,
+      "real_time_reserve_s": 15.0,
+      "min_action_capacity": 10,
+      "max_rounds": 400,
+      "stall_limit": 4,
+      "near_candidate_scales": [
+        0.35,
+        0.7
+      ],
+      "near_candidate_span_m": 900.0,
+      "backstop_min_hole_m2": 400000.0,
+      "backstop_max_stations": 12,
+      "enable_dynamic_endgame": true,
+      "dynamic_endgame_min_clears": 10,
+      "enable_route_aware_endgame": true,
+      "route_endgame_min_clears": 14,
+      "revisit_radius_m": 400.0,
+      "revisit_penalty_s": 0.0,
+      "enable_guaranteed_tracking": false,
+      "tracking_debt_limit_rounds": 10
+    }
+  }
+}

@@ -15,8 +15,8 @@ import numpy as np
 from . import config as settings
 from .base_models import distance_to_wedge, min_enclosing_circle, sampled_diameter
 from .config import (CHANNEL_COUNT, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
-                     MIN_RECEIVE_RADIUS_M, NEAR_DISTANCE_M, ROBOT_SPEED_MPS,
-                     TARGET_RADIUS_M)
+                     MIN_RECEIVE_RADIUS_M, MIN_SOURCE_COUNT, NEAR_DISTANCE_M,
+                     ROBOT_SPEED_MPS, TARGET_RADIUS_M)
 from .offline_stub import OfflineStub, Source
 from .problem3_model import (ChannelKnowledge, Lattice, apply_direction,
                              apply_distance_order, apply_near, apply_outside, apply_wedge,
@@ -719,6 +719,74 @@ class BackstopSearchTests(unittest.TestCase):
             if channel != 6:
                 tight.channels[channel].mark_cleared(0.0)
         self.assertIsNone(tight._backstop_search_plan(5))
+
+    def test_dynamic_endgame_competes_with_fixed_grid(self):
+        """达到源数下界后，动态空洞方案应能替代更慢的固定格点方案。"""
+        for channel in range(1, MIN_SOURCE_COUNT + 1):
+            self.strategy.channels[channel].mark_cleared(0.0)
+            self.strategy.cleared.add(channel)
+        fixed = StopPlan('sweep', np.array([1200.0, 1200.0]), [11], score_s=500.0)
+        dynamic = StopPlan('backstop', np.array([300.0, 200.0]), [11], score_s=120.0)
+        with (mock.patch.object(self.strategy, '_best_search_plan', return_value=fixed),
+              mock.patch.object(self.strategy, '_backstop_search_plan', return_value=dynamic)):
+            plan = self.strategy._search_plan()
+        self.assertIs(plan, dynamic)
+
+    def test_dynamic_endgame_waits_until_source_lower_bound(self):
+        """清除不足十个源时仍保持常规搜索，避免过早转入不存在性收尾。"""
+        for channel in range(1, MIN_SOURCE_COUNT):
+            self.strategy.channels[channel].mark_cleared(0.0)
+            self.strategy.cleared.add(channel)
+        fixed = StopPlan('sweep', np.array([1200.0, 0.0]), [10], score_s=200.0)
+        with (mock.patch.object(self.strategy, '_best_search_plan', return_value=fixed),
+              mock.patch.object(self.strategy, '_backstop_search_plan') as dynamic_mock):
+            plan = self.strategy._search_plan()
+        self.assertIs(plan, fixed)
+        dynamic_mock.assert_not_called()
+
+    def test_farthest_point_candidates_cover_both_ends(self):
+        """最远点采样应覆盖狭长空洞两端，而不是集中在数组局部。"""
+        points = np.column_stack((np.arange(11, dtype=float), np.zeros(11)))
+        candidates = self.strategy._farthest_point_candidates(points, 3)
+        self.assertEqual(len(candidates), 3)
+        self.assertAlmostEqual(float(candidates[:, 0].min()), 0.0)
+        self.assertAlmostEqual(float(candidates[:, 0].max()), 10.0)
+
+    def test_route_endgame_selects_lowest_full_route_cost(self):
+        """路线兜底应按完整补证代价选首站，而不是沿用单站信息增益排序。"""
+        candidates = np.array([[-1200.0, 0.0], [1200.0, -1200.0]])
+        self.strategy._candidate_waypoints = lambda: candidates
+        self.strategy._search_options = lambda waypoint, min_gain, cap: [1]
+        self.strategy._search_cap = lambda: CHANNEL_COUNT
+        self.strategy._absence_route_seconds = (
+            lambda waypoint, measures, active: 100.0 if waypoint[0] > 0.0 else 500.0)
+        plan = self.strategy._route_aware_endgame_plan()
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.kind, 'route_backstop')
+        np.testing.assert_allclose(plan.waypoint, [1200.0, -1200.0])
+
+    def test_absence_route_simulation_does_not_mutate_real_masks(self):
+        """无信号情景前瞻只能修改掩码副本，不得伪造观测或覆盖证书。"""
+        original = self.strategy.channels[1].mask.copy()
+        observations = len(self.strategy.channels[1].observations)
+        score = self.strategy._absence_route_seconds(
+            np.array([0.0, 0.0]), [1], [1])
+        self.assertTrue(np.isfinite(score))
+        np.testing.assert_array_equal(self.strategy.channels[1].mask, original)
+        self.assertEqual(len(self.strategy.channels[1].observations), observations)
+
+    def test_detected_channel_disables_route_endgame(self):
+        """只要仍有已发现源，路线补证不得抢占正常追踪动作。"""
+        for channel in range(1, 15):
+            self.strategy.channels[channel].mark_cleared(0.0)
+            self.strategy.cleared.add(channel)
+        fixed = StopPlan('sweep', np.array([1200.0, 0.0]), [16], score_s=100.0)
+        with (mock.patch.object(self.strategy, '_best_search_plan', return_value=fixed),
+              mock.patch.object(self.strategy, '_detected_channels', return_value=[15]),
+              mock.patch.object(self.strategy, '_route_aware_endgame_plan') as route_mock):
+            plan = self.strategy._search_plan()
+        self.assertIs(plan, fixed)
+        route_mock.assert_not_called()
 
     def test_backstop_targets_largest_connected_hole(self):
         """存在大块残余空洞时，兜底选点必须朝空洞走，而不是停在已扫过的中心。"""
