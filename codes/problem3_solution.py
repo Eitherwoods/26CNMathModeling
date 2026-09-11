@@ -92,6 +92,8 @@ def summarize(record, true_total=None):
         'average_clear_time_s': None if count == 0 else round(total_virtual / count, 3),
         'program_runtime_s': round(float(record['real_elapsed_s']), 3),
         'stop_reason': record['stop_reason'],
+        'unresolved_channels': list(record.get('unresolved_channels', [])),
+        'inconsistent_channels': list(record.get('inconsistent_channels', [])),
         'actions': len(record['steps']),
         'moved_distance_m': round(float(record['moved_distance_m']), 3),
         'planner_errors': record['planner_errors'],
@@ -146,6 +148,16 @@ class Problem3Strategy:
     def _detected_channels(self):
         return [channel for channel, knowledge in self.channels.items()
                 if knowledge.status == 'detected' and knowledge.is_active]
+
+    def _observed_channels(self):
+        """已有任意读数的活跃频道：可靠/试探清除的候选来源。
+
+        比 `_detected_channels` 更宽：只要该频道拿到过示向度、距离过近或无信号中
+        任意一类读数，就进入清除判断，与 §3.5"根据最新信息逐频道判断"一致。
+        无可读数的频道其位置集合仍是整个区域，必然不满足任何清除条件。
+        """
+        return [channel for channel, knowledge in self.channels.items()
+                if knowledge.is_active and knowledge.observations]
 
     def _reach(self, waypoint):
         """候选停靠点的可检测格点集合（按停靠点缓存）。"""
@@ -477,7 +489,7 @@ class Problem3Strategy:
     def _clear_candidates(self, waypoint):
         """决策4：以第三项结束后的最新信息判断是否清除。"""
         certain, speculative = [], []
-        for channel in self._detected_channels():
+        for channel in self._observed_channels():
             knowledge = self.channels[channel]
             if knowledge.cleared_here(waypoint[0], waypoint[1]):
                 continue
@@ -486,9 +498,10 @@ class Problem3Strategy:
                 certain.append(channel)
                 continue
             limit = knowledge.max_distance_m(waypoint[0], waypoint[1])
+            if limit is None or limit > self.config.speculative_clear_m:
+                continue
             probability = knowledge.clear_probability(waypoint[0], waypoint[1])
-            if (limit is not None and limit <= self.config.speculative_clear_m
-                    and probability >= self.config.speculative_min_probability):
+            if probability >= self.config.speculative_min_probability:
                 speculative.append((probability, channel))
         speculative.sort(key=lambda item: -item[0])
         return certain + [channel for _, channel in speculative]
@@ -529,9 +542,17 @@ class Problem3Strategy:
 
     # --------------------------------------------------------- 决策5：结束
 
+    def _inconsistent_channels(self):
+        return sorted(channel for channel, knowledge in self.channels.items()
+                      if knowledge.is_inconsistent)
+
     def _finished(self):
         if len(self.cleared) >= MAX_SOURCE_COUNT:
             return 'cleared_limit'
+        # §3.6：已发现频道的可能位置集合突然变空属矛盾状态，
+        # 先检查约束一致性与数值误差，不得据此宣布该目标不存在。
+        if self._inconsistent_channels():
+            return 'model_inconsistent'
         if all(not knowledge.is_active for knowledge in self.channels.values()):
             return 'all_channels_resolved'
         return None
@@ -571,6 +592,9 @@ class Problem3Strategy:
         return {
             'stop_reason': self.stop_reason,
             'cleared_channels': sorted(self.cleared),
+            'unresolved_channels': sorted(channel for channel, knowledge in self.channels.items()
+                                          if knowledge.is_active),
+            'inconsistent_channels': self._inconsistent_channels(),
             'start_virtual_time_s': self.start_virtual_time_s,
             'end_virtual_time_s': float(self.context.state.virtual_time_s),
             'real_elapsed_s': self._real_elapsed_s(),

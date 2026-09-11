@@ -16,7 +16,7 @@ from .problem3_model import (ChannelKnowledge, Lattice, apply_direction,
                              apply_near, apply_outside, apply_wedge,
                              coverage_radius_m, hex_waypoints,
                              sweep_waypoint_gain, wedge_distance)
-from .problem3_solution import Problem3Config, run_mission, summarize
+from .problem3_solution import Problem3Config, Problem3Strategy, run_mission, summarize
 from .protocol import RobotClient, decode, encode
 from .scenario import fixed_scenario, random_scenario, sweep_waypoints
 from .strategy import run_strategy
@@ -204,14 +204,33 @@ class ChannelKnowledgeTests(unittest.TestCase):
         self.assertGreater(float(center[0]), 0.0)
 
     def test_clear_failure_excludes_clear_radius(self):
-        """清除失败等价于"目标不在 20 米内"，据此删除圆域并使频道失效。"""
-        self.knowledge.observe_near(0.0, 0.0)
+        """清除失败等价于"目标不在 20 米内"，据此删除该圆域内的格点。"""
+        self.knowledge.observe_direction(0.0, 0.0, 0.0)
+        before = self.knowledge.possible_area_m2
         self.knowledge.observe_clear_failure(0.0, 0.0)
-        self.assertTrue(self.knowledge.is_excluded)
-        self.assertFalse(self.knowledge.is_active)
-        self.assertIsNone(self.knowledge.max_distance_m(0.0, 0.0))
+        self.assertLess(self.knowledge.possible_area_m2, before)
         self.assertTrue(self.knowledge.cleared_here(0.0, 0.0))
         self.assertFalse(self.knowledge.cleared_here(5.0, 0.0))
+        self.assertTrue(self.knowledge.is_active)
+
+    def test_clear_failure_removes_inner_disc_only(self):
+        """清除失败的排除圆半径是 20 米（按覆盖半径保守收紧）。"""
+        lattice = probe_lattice()
+        knowledge = ChannelKnowledge(7, lattice, lattice)
+        knowledge.observe_clear_failure(0.0, 0.0)
+        kept = survivors(knowledge.mask)
+        self.assertNotIn((18.0, 0.0), kept)
+        self.assertIn((20.0, 0.0), kept)
+        self.assertIn((25.0, 0.0), kept)
+
+    def test_near_then_clear_failure_is_flagged_inconsistent(self):
+        """先"距离过近"(<=5 m)再"清除失败"(>20 m)互相矛盾，必须报矛盾而非判不存在。"""
+        self.knowledge.observe_near(0.0, 0.0)
+        self.knowledge.observe_clear_failure(0.0, 0.0)
+        self.assertTrue(self.knowledge.is_inconsistent)
+        self.assertFalse(self.knowledge.is_excluded)
+        self.assertTrue(self.knowledge.is_active)
+        self.assertTrue(self.knowledge.cleared_here(0.0, 0.0))
 
     def test_mark_cleared_empties_and_deactivates(self):
         """清除成功后位置集合清空、状态转为已清除。"""
@@ -227,6 +246,45 @@ class ChannelKnowledgeTests(unittest.TestCase):
         self.knowledge.observe_direction(100.0, 0.0, 45.0)
         self.assertIsNotNone(self.knowledge.measured_at(100.0, 0.0))
         self.assertIsNone(self.knowledge.measured_at(100.5, 0.0))
+
+    def test_near_first_reading_marks_channel_detected(self):
+        """首个读数就是距离过近时，频道必须进入已发现状态。
+
+        否则清除候选（按已发现频道筛选）会整个跳过它，导致该源被永久漏掉。
+        """
+        self.knowledge.observe_near(0.0, 0.0)
+        self.assertEqual(self.knowledge.status, 'detected')
+        self.assertTrue(self.knowledge.is_active)
+        self.assertFalse(self.knowledge.is_excluded)
+        self.assertIsNotNone(self.knowledge.detected_virtual_s)
+        self.assertTrue(self.knowledge.certain_clear(0.0, 0.0))
+
+    def test_no_signal_alone_does_not_mark_channel_detected(self):
+        """无信号读数不构成"已发现"：频道仍是未知状态。"""
+        lattice = probe_lattice()
+        knowledge = ChannelKnowledge(7, lattice, lattice)
+        knowledge.observe_no_signal(0.0, 0.0)
+        self.assertEqual(knowledge.status, 'unknown')
+        self.assertEqual(len(knowledge.observations), 1)
+        self.assertTrue(knowledge.is_active)
+        self.assertFalse(knowledge.is_excluded)
+        self.assertNotIn((18.0, 0.0), survivors(knowledge.mask))
+        self.assertIn((1600.0, 0.0), survivors(knowledge.mask))
+
+    def test_detected_channel_with_empty_mask_is_inconsistent(self):
+        """已取得读数却算出空掩码属矛盾状态：不得当成"该频道不存在"。"""
+        self.knowledge.observe_direction(0.0, 0.0, 0.0)
+        self.assertFalse(self.knowledge.is_inconsistent)
+        self.knowledge.mask[:] = False
+        self.assertTrue(self.knowledge.is_inconsistent)
+        self.assertFalse(self.knowledge.is_excluded)
+        self.assertTrue(self.knowledge.is_active)
+
+    def test_cleared_channel_is_not_inconsistent(self):
+        """正常清除产生的空掩码不是矛盾状态。"""
+        self.knowledge.mark_cleared(10.0)
+        self.assertFalse(self.knowledge.is_inconsistent)
+        self.assertFalse(self.knowledge.is_active)
 
     def test_region_estimate_excludes_covering_radius(self):
         """最小覆盖圆只返回几何外接半径：至多为 5 + r_h，不含第二次覆盖半径外扩。"""
@@ -368,6 +426,62 @@ def measure_body(channel, x, y, robot_id='offline-team'):
                    'position': {'x': x, 'y': y}, 'channel': channel})
 
 
+class StrategyGuardTests(unittest.TestCase):
+    """决策五的一致性护栏与清除候选筛选。"""
+
+    def setUp(self):
+        """最小上下文：策略只读取位置、频道与虚拟时间。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_finished_is_none_before_any_observation(self):
+        """初始状态下既没清满也没全部解决，不判完成。"""
+        self.assertIsNone(self.strategy._finished())
+
+    def test_finished_flags_inconsistent_channel(self):
+        """矛盾频道必须单独报出，且记录里可追溯。"""
+        probe = self.strategy.channels[7]
+        probe.observe_direction(0.0, 0.0, 0.0)
+        probe.mask[:] = False
+        self.assertEqual(self.strategy._finished(), 'model_inconsistent')
+        self.assertEqual(self.strategy._inconsistent_channels(), [7])
+        self.assertEqual(self.strategy._result()['inconsistent_channels'], [7])
+
+    def test_clear_candidates_include_near_only_channel(self):
+        """只拿到距离过近读数的频道必须进入清除候选（回归：曾整个被跳过）。"""
+        probe = self.strategy.channels[5]
+        probe.observe_near(0.0, 0.0)
+        self.assertEqual(self.strategy._clear_candidates((0.0, 0.0)), [5])
+
+    def test_clear_candidates_ignore_unobserved_channel(self):
+        """没有任何读数的频道不进入清除候选。"""
+        self.assertEqual(self.strategy._clear_candidates((0.0, 0.0)), [])
+
+    def test_observed_channels_covers_near_and_no_signal(self):
+        """清除候选来源按"有过任意读数"筛选，而不是只看示向度。"""
+        self.strategy.channels[3].observe_no_signal(1500.0, 0.0)
+        self.strategy.channels[4].observe_near(0.0, 0.0)
+        self.assertEqual(self.strategy._observed_channels(), [3, 4])
+
+
+class _DummyContext:
+    """满足策略构造与预算查询所需最小接口的测试替身。"""
+
+    class _State:
+        position = (0.0, 0.0)
+        channel = 1
+        virtual_time_s = 0.0
+
+    def __init__(self):
+        self.state = self._State()
+
+    @property
+    def remaining_real_duration_s(self):
+        return None
+
+    def should_stop(self):
+        return False
+
+
 class OfflineEndToEndTests(unittest.TestCase):
     """离线端到端：固定案例必须全部清除；轮次与停滞保护必须生效。"""
 
@@ -403,7 +517,22 @@ class OfflineEndToEndTests(unittest.TestCase):
                                summary['total_virtual_time_s'] / 3, places=3)
         self.assertGreaterEqual(summary['program_runtime_s'], 0.0)
         self.assertGreater(summary['moved_distance_m'], 0.0)
+        self.assertEqual(summary['inconsistent_channels'], [])
         self.assertIn(summary['stop_reason'], ('cleared_limit', 'all_channels_resolved'))
+
+    def test_source_within_five_metres_of_start_is_cleared(self):
+        """起点 5 米内的源首个读数只能是"距离过近"，必须就地清除（回归 H1）。"""
+        scenario = fixed_scenario([(5, 3.0, 0.0), (9, 900.0, 0.0)])
+        config = Problem3Config(max_rounds=3)
+        stub = OfflineStub(sources=scenario.sources)
+        client = RobotClient('offline-team', stub)
+        result = run_strategy(client, lambda context: run_mission(context, config), problem=3)
+        record = result['algorithm_result']
+        self.assertIn(5, record['cleared_channels'])
+        self.assertEqual(record['planner_errors'], 0)
+        self.assertEqual(record['inconsistent_channels'], [])
+        results = [step['result'] for step in record['steps'] if step['channel'] == 5]
+        self.assertIn('near', results)
 
     def test_record_is_json_serializable_and_complete(self):
         """任务记录必须可序列化，且包含轨迹、频道序列与配置快照。"""

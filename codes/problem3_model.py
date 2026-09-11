@@ -221,20 +221,33 @@ class ChannelKnowledge:
         self.observations.append(Observation(float(x), float(y), result, bearing_deg,
                                             float(virtual_time_s)))
         self.measure_positions.append((float(x), float(y)))
-        if result == 'direction' and self.status == 'unknown':
+        # 距离过近同样是"已发现该干扰源"的证据：它给出 B(x,5) 的强约束，
+        # 且按 §3.5 第 2 条应当就地清除。若只认示向度，仅在近场取到读数的频道
+        # 会被清除候选完全跳过（真实缺陷，见 test_problem3 的 near 回归测试）。
+        if result != 'no_signal' and self.status == 'unknown':
             self.status = 'detected'
             self.detected_virtual_s = float(virtual_time_s)
 
     # ------------------------------------------------------------------ 查询
 
     @property
+    def is_inconsistent(self):
+        """已取得读数却算出空掩码：矛盾状态。
+
+        掩码为空本来意味着"该频道在目标区域内不存在"，但一个已经收到过读数的
+        频道显然存在，因此这是约束不一致或数值退化的信号。此时不能宣布它不存在，
+        也不能照常推进，必须单独标记（对应 §3.6 列出的第三类"不能判定完成"情形）。
+        """
+        return self.status == 'detected' and not bool(self.mask.any())
+
+    @property
     def is_excluded(self):
-        """掩码为空：可证明该频道在目标区域内没有干扰源。"""
-        return not bool(self.mask.any())
+        """掩码为空且无矛盾读数：可证明该频道在目标区域内没有干扰源。"""
+        return self.status != 'detected' and not bool(self.mask.any())
 
     @property
     def is_active(self):
-        """仍需处理的频道：未清除且未被排除。"""
+        """仍需处理的频道：未清除且未被排除（矛盾频道保持活跃，等待人工判读）。"""
         return self.status != 'cleared' and not self.is_excluded
 
     @property
