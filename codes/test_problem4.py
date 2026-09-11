@@ -22,9 +22,9 @@ from .config import (MIN_RECEIVE_RADIUS_M, PROBLEM4_OUTPUT_DIR, PROTOCOL_LOG_DIR
 from .offline_stub import OfflineStub, Source
 from .problem3_model import Lattice
 from .problem4_model import Problem4Knowledge, triangular_search_waypoints
-from .problem4_solution import (Problem4Config, Problem4Strategy, build_scenario,
-                                feedback_score, is_offline_run, main, run_mission,
-                                solve, summarize)
+from .problem4_solution import (Problem4Config, Problem4Strategy, StopPlan,
+                                build_scenario, feedback_score, is_offline_run,
+                                main, run_mission, solve, summarize)
 from .protocol import HttpTransport, RobotClient
 from .scenario import fixed_scenario
 from .scenario_p4 import boundary_scenario, mixed_scenario
@@ -213,6 +213,27 @@ class StrategyEvidenceTests(unittest.TestCase):
         for bad in (0, -3, True):
             with self.assertRaises(ValueError):
                 Problem4Config(fairness_age_rounds=bad)
+
+    def test_finish_detected_switch_must_be_boolean(self):
+        """连续处理开关不能接受会被误当作真假的数值。"""
+        with self.assertRaises(ValueError):
+            Problem4Config(finish_detected_before_search=1)
+
+    def test_detected_target_postpones_search_and_search_resumes(self):
+        """目标未清除时连续追踪，清除后仍恢复原覆盖计划。"""
+        self.strategy.round = 4
+        self.strategy.channels[1].status = 'detected'
+        track = StopPlan(np.array([100.0, 0.0]), 'track', channel=1)
+        search = StopPlan(np.array([900.0, 0.0]), 'search', search_index=0)
+        with (mock.patch.object(self.strategy, '_search_plan', return_value=search),
+              mock.patch.object(self.strategy, '_tracking_plan', return_value=track),
+              mock.patch.object(self.strategy, '_next_channel', return_value=1)):
+            _, selected = self.strategy.decide_direction()
+        self.assertIs(selected, track)
+        self.strategy.channels[1].mark_cleared()
+        with mock.patch.object(self.strategy, '_search_plan', return_value=search):
+            _, selected = self.strategy.decide_direction()
+        self.assertIs(selected, search)
 
 
 class LocalProtocolTests(unittest.TestCase):

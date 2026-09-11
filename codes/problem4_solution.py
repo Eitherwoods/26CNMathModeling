@@ -35,6 +35,7 @@ class Problem4Config:
     radius_bins: int = settings.PROBLEM4_RADIUS_BINS
     hypothesis_limit: int = settings.PROBLEM4_HYPOTHESIS_LIMIT
     search_interval: int = settings.PROBLEM4_SEARCH_INTERVAL
+    finish_detected_before_search: bool = settings.PROBLEM4_FINISH_DETECTED_BEFORE_SEARCH
     tracking_limit: int = settings.PROBLEM4_TRACKING_LIMIT
     fairness_age_rounds: int = settings.PROBLEM4_FAIRNESS_AGE_ROUNDS
     max_rounds: int = settings.PROBLEM4_MAX_ROUNDS
@@ -59,6 +60,8 @@ class Problem4Config:
             raise ValueError('退出预留时间必须非负且有限。')
         if not self.step_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.step_lengths_m):
             raise ValueError('候选步长必须为正的有限值。')
+        if not isinstance(self.finish_detected_before_search, bool):
+            raise ValueError('连续追踪开关必须为布尔值。')
 
 
 @dataclass
@@ -246,12 +249,18 @@ class Problem4Strategy:
         return min(detected, key=lambda c: (self._channel_travel_m(c), self.last_served[c], c))
 
     def decide_direction(self):
-        """第一项决策输出方向及任务依据，覆盖和已知频道均不会被永久搁置。"""
+        """第一项决策输出方向，并优先连续处理已发现目标。
+
+        单个目标最多经历有限次追踪，随后进入每次均删除位置单元的后备清除，
+        所以连续处理必然结束；目标处理完毕后恢复三角网格覆盖，无需周期性跨区折返。
+        """
         search = self._search_plan()
         detected = self._detected()
         if self.round == 0:
             plan = StopPlan(self.position.copy(), 'initial')
-        elif search is not None and (not detected or self.round % self.config.search_interval == 0):
+        elif (search is not None and
+              (not detected or (not self.config.finish_detected_before_search
+                                and self.round % self.config.search_interval == 0))):
             plan = search
         elif detected:
             plan = self._tracking_plan(self._next_channel(detected))

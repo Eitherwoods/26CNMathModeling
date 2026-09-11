@@ -32,7 +32,7 @@ from . import config as settings
 from .base_models import bearing_deg
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
-                     MAX_SOURCE_COUNT,
+                     MAX_SOURCE_COUNT, MIN_SOURCE_COUNT,
                      MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M, ROBOT_SPEED_MPS,
                      TARGET_RADIUS_M)
 from .problem3_model import ChannelKnowledge, Lattice, apply_direction, hex_waypoints
@@ -78,6 +78,12 @@ class Problem3Config:
     # 不被零星毛刺引走（实测阈值过低会使行进反升）。
     backstop_min_hole_m2: float = 4.0e5
     backstop_max_stations: int = 12
+    # 已清除数达到题目下界且没有待追踪源时，动态残余空洞候选与固定格点同台评分。
+    enable_dynamic_endgame: bool = True
+    dynamic_endgame_min_clears: int = MIN_SOURCE_COUNT
+    # 清除数较高时，按“剩余频道均无信号”的情景估计完整补证路线，只执行首站。
+    enable_route_aware_endgame: bool = True
+    route_endgame_min_clears: int = 14
     # 可选停靠点回访惩罚。同站补测开启后默认关闭，避免把仍有价值的近点推迟到
     # 收尾阶段，形成跨场折返；保留参数便于关闭同站补测时做对照实验。
     revisit_radius_m: float = 400.0
@@ -471,10 +477,12 @@ class Problem3Strategy:
     def _search_plan(self):
         """覆盖搜索选项：以"每期望清除数所需秒数"评价候选停靠点。
 
-        三段式：
+        五段式：
         1. 按新增排除面积下限筛选（常规高增益搜索）；
         2. 去掉下限再找一次（只剩零星残差时的常规兜底）；
-        3. **覆盖兜底**：若仍有整块残余空洞没被候选格网命中，直接以
+        3. 清除数达到题目下界且无待追踪源时，让动态空洞站点与固定格点竞争；
+        4. 已清除至少 14 个源时，在无信号情景下前瞻完整补证路线，仅执行首站；
+        5. **覆盖兜底**：若固定格点无方案而仍有整块残余空洞，直接以
            "补齐最大连通空洞"为目标选点。
 
         关于覆盖完备性（`verify_coverage_completeness` 可离线验证）：
@@ -482,7 +490,7 @@ class Problem3Strategy:
         1000 m，因此**若某频道在全部候选点均无信号，则该频道确实不存在**——
         这是一条严格结论，不依赖轨迹偶然性。
 
-        第 3 段兜底仍然保留，理由是"候选点全测"要求该频道在每个点都被安排检测，
+        动态方案和第 5 段兜底仍然保留，理由是"候选点全测"要求该频道在每个点都被安排检测，
         而每站只取 `search_channels_per_stop` 个未发现频道；当活跃频道很多、
         时间预算又紧时，`_search_cap` 会进一步收紧每站检测数，理论上存在
         "某频道凑不齐 9 点就被判终止"的窗口。兜底段是这一窗口的安全网，
@@ -495,11 +503,128 @@ class Problem3Strategy:
         remaining_sources = min(MAX_SOURCE_COUNT - len(self.cleared), uncleared)
         if remaining_sources <= 0:
             return None
+        fixed_plan = None
         for min_gain in (self.config.search_min_gain_m2, 0.0):
-            plan = self._best_search_plan(remaining_sources, min_gain)
-            if plan is not None:
-                return plan
+            fixed_plan = self._best_search_plan(remaining_sources, min_gain)
+            if fixed_plan is not None:
+                break
+
+        # 达到干扰源数量下界后，未知频道很可能已经不存在。此时优化目标从
+        # “尽快发现新源”逐渐转为“用最短路线补齐排除证据”，允许动态空洞站点
+        # 与固定覆盖格点竞争，避免固定九点在收尾阶段产生跨场折返。
+        dynamic_plan = None
+        if (self.config.enable_dynamic_endgame
+                and len(self.cleared) >= self.config.dynamic_endgame_min_clears
+                and not self._detected_channels()):
+            dynamic_plan = self._backstop_search_plan(remaining_sources)
+
+        # 已清除源较多时，“剩余频道实际不存在”已经是不可忽略的情景。此处在
+        # 掩码副本上模拟无信号结果，估计完整补证路线并只执行最优路线的首站。
+        # 若首站真实返回示向或近场，下一轮会立即退出本分支并恢复追踪。
+        if (self.config.enable_route_aware_endgame
+                and len(self.cleared) >= self.config.route_endgame_min_clears
+                and not self._detected_channels()):
+            route_plan = self._route_aware_endgame_plan(dynamic_plan)
+            if route_plan is not None:
+                return route_plan
+
+        plans = [plan for plan in (fixed_plan, dynamic_plan) if plan is not None]
+        if plans:
+            return min(plans, key=lambda plan: plan.score_s)
         return self._backstop_search_plan(remaining_sources)
+
+    def _route_aware_endgame_plan(self, dynamic_plan=None):
+        """在无信号情景下估计完整补证路线，并返回预计总代价最小的首站。
+
+        候选首站包含当前位置、固定覆盖格点以及当前动态空洞方案。对每个首站，
+        在后验掩码副本上假设相关频道返回无信号，再用最近必要站规则补齐固定
+        覆盖点。模拟过程绝不修改真实知识状态或覆盖证书。
+        """
+        active = [channel for channel in self._active_channels()
+                  if self.channels[channel].status == 'unknown']
+        if not active:
+            return None
+        first_candidates = list(self._candidate_waypoints())
+        if dynamic_plan is not None:
+            first_candidates.append(np.asarray(dynamic_plan.waypoint, dtype=float))
+        first_candidates = np.unique(
+            np.round(np.asarray(first_candidates, dtype=float), decimals=6), axis=0)
+
+        best = None
+        best_total_s = float('inf')
+        for waypoint in first_candidates:
+            measures = self._search_options(waypoint, 0.0, None)
+            measures = [channel for channel in measures if channel in active]
+            measures = measures[:max(1, self._search_cap())]
+            if not measures:
+                continue
+            total_s = self._absence_route_seconds(waypoint, measures, active)
+            if total_s < best_total_s:
+                best_total_s = total_s
+                best = StopPlan(
+                    'route_backstop', np.asarray(waypoint, dtype=float), measures,
+                    self._travel_m(waypoint), score_s=total_s,
+                    note='路线前瞻兜底：执行无信号情景最短补证路线的首站')
+        return best
+
+    def _absence_route_seconds(self, first_waypoint, first_measures, active_channels):
+        """在掩码副本上模拟无信号补证路线，返回移动与测量总时间估计。
+
+        后续每一步仅在固定覆盖格点中选择距离当前位置最近、且仍能排除残余
+        区域的站点。固定格点具有完整覆盖证明，因此模拟若正常结束必能清空掩码。
+        """
+        masks = {channel: self.channels[channel].mask.copy()
+                 for channel in active_channels}
+        position = np.asarray(self.position, dtype=float)
+        total_s = 0.0
+        visited = set()
+        simulated_channel = self.current_channel
+
+        def visit(waypoint, channels):
+            """在模拟副本上访问一个站点，并累计移动与测量时间。"""
+            nonlocal position, simulated_channel, total_s
+            waypoint = np.asarray(waypoint, dtype=float)
+            total_s += float(np.linalg.norm(waypoint - position)) / ROBOT_SPEED_MPS
+            ordered = sorted(set(channels),
+                             key=lambda channel: (channel != simulated_channel, channel))
+            switches = 0
+            previous = simulated_channel
+            for channel in ordered:
+                if channel != previous:
+                    switches += 1
+                previous = channel
+            total_s += MEASURE_TIME_S * len(ordered) + CHANNEL_SWITCH_TIME_S * switches
+            if ordered:
+                simulated_channel = ordered[-1]
+            reach = self._reach(waypoint)
+            for channel in ordered:
+                masks[channel] &= ~reach
+            position = waypoint
+            visited.add((round(float(waypoint[0]), 6), round(float(waypoint[1]), 6)))
+
+        visit(first_waypoint, first_measures)
+        for _ in range(len(self.candidates)):
+            if not any(mask.any() for mask in masks.values()):
+                return total_s
+            options = []
+            for waypoint in self.candidates:
+                key = (round(float(waypoint[0]), 6), round(float(waypoint[1]), 6))
+                if key in visited:
+                    continue
+                reach = self._reach(waypoint)
+                channels = [channel for channel, mask in masks.items()
+                            if np.any(mask & reach)]
+                if not channels:
+                    continue
+                distance_m = float(np.linalg.norm(np.asarray(waypoint) - position))
+                gain = sum(int(np.count_nonzero(masks[channel] & reach))
+                           for channel in channels)
+                options.append((distance_m, -gain, waypoint, channels))
+            if not options:
+                break
+            _, _, waypoint, channels = min(options, key=lambda item: (item[0], item[1]))
+            visit(waypoint, channels)
+        return float('inf')
 
     def verify_coverage_completeness(self, margin_m=0.0):
         """离线自检：候选停靠点是否足以对任意源位置给出"无信号"或"发现"。
@@ -553,8 +678,11 @@ class Problem3Strategy:
         hole_area = len(hole) * stride_m ** 2
         if hole_area < self.config.backstop_min_hole_m2:
             return None
-        # 候选：空洞的采样点 + 空洞里离当前位置最近的若干点。
-        sample = hole[::max(1, len(hole) // 48)]
+        # 候选不再依赖固定九点：在当前最大残余空洞上做最远点采样，形成随
+        # 后验掩码变化的动态站点。相比按数组下标等距抽样，最远点采样能稳定
+        # 覆盖狭长、月牙形和偏心空洞，不会漏掉几何上关键的端部。
+        sample = self._farthest_point_candidates(
+            hole, self.config.backstop_max_stations)
         nearest = hole[np.argsort(np.linalg.norm(hole - np.array(self.position), axis=1))[:4]]
         # 再沿当前位置到空洞重心的方向补几个中间点，避免"一步到位"式长跳：
         # 中间点让策略有机会在通往空洞的路上顺带取得读数。
@@ -563,7 +691,11 @@ class Problem3Strategy:
         bridges = []
         for ratio in (0.35, 0.7):
             bridges.append(position + ratio * (centroid - position))
-        candidates = np.vstack((sample, nearest, np.asarray(bridges)))
+        candidates = np.vstack((sample, nearest, centroid[None, :], np.asarray(bridges)))
+        # 数值格点与插值桥点可能重复；统一去重并确保站点位于题目目标圆域内。
+        candidates = np.unique(np.round(candidates, decimals=6), axis=0)
+        inside = np.hypot(candidates[:, 0], candidates[:, 1]) <= TARGET_RADIUS_M + 1e-9
+        candidates = candidates[inside]
         best, best_score = None, float('inf')
         for waypoint in candidates:
             measures = self._search_options(waypoint, 0.0, None)
@@ -585,6 +717,33 @@ class Problem3Strategy:
                                 note='覆盖兜底：补齐连通残余空洞')
                 best_score = score
         return best
+
+    @staticmethod
+    def _farthest_point_candidates(points, limit):
+        """对残余空洞做确定性最远点采样，返回几何分散的动态候选站点。
+
+        首点取最接近空洞质心的格点；之后每次加入距已选集合最远的格点，
+        相当于小规模 k-center 贪心。为控制实时规划耗时，超大空洞先均匀下采样。
+        """
+        points = np.asarray(points, dtype=float)
+        limit = max(1, int(limit))
+        if len(points) <= limit:
+            return points.copy()
+        if len(points) > 12000:
+            stride = int(np.ceil(len(points) / 12000))
+            pool = points[::stride]
+        else:
+            pool = points
+        centroid = np.mean(pool, axis=0)
+        first = int(np.argmin(np.linalg.norm(pool - centroid, axis=1)))
+        selected = [first]
+        min_distance_sq = np.sum((pool - pool[first]) ** 2, axis=1)
+        for _ in range(1, min(limit, len(pool))):
+            next_index = int(np.argmax(min_distance_sq))
+            selected.append(next_index)
+            distance_sq = np.sum((pool - pool[next_index]) ** 2, axis=1)
+            min_distance_sq = np.minimum(min_distance_sq, distance_sq)
+        return pool[np.asarray(selected, dtype=int)]
 
     @staticmethod
     def _connected_clusters(points, link_m):
