@@ -81,6 +81,8 @@
 
 \subsection{问题二分析}
 
+问题二要求在仅有一个检测点示向度的条件下，为全向干扰源选择第二个检测点以获得最优定位效果。核心思路是利用"同一干扰源的接收半径在两次观测间固定"这一约束，构造位置与半径的联合可行集$\mathcal{H}_1$，进而确定能够保证第二次检测仍收到信号的可靠区域$C_{\mathrm{rec}}$。在此区域内，以最坏后验定位直径$J(X)$作为稳健质量指标，将$J(X)$接近最优值的点组成候选区域$C_{\mathrm{good}}$，最终以移动距离最小为次级目标选定第二检测点。
+
 \subsection{问题三分析}
 
 
@@ -93,6 +95,8 @@
 \item[3. 信号均匀辐射] 在有效覆盖角度范围内，干扰源信号场强仅随距离衰减，与角度无关。
 \item[4. 独立可接收] 不同干扰源信号互不影响；各检测点均位于干扰源有效接收半径范围内，能够接收到信号。
 \item[5. 坐标系设定] 以目标区域圆心为原点，正东方向为$x$轴正向，正北方向为$y$轴正向，单位为米。
+\item[6. 干扰源参数固定] 干扰源的位置、频道和有效接收半径在一次任务中保持不变；每个频道至多对应一个干扰源。
+\item[7. 近距与清除阈值] 当检测点距干扰源不超过$5$米且位于有效覆盖范围内时，测向机返回"距离过近"；距离不超过$20$米时可启用光学精确定位与激光清除。
 \end{description}
 
 % ==================== 符号说明 ====================
@@ -119,6 +123,10 @@ $A,b$ & 半平面约束矩阵与向量 & --- & $V_i$ & 定位区域第$i$个顶�
 $n$ & 顶点个数 & 个 & $D(P)$ & 定位区域直径 & m \\
 $G$ & 干扰源位置 & --- & $\Omega$ & 目标圆域(半径$1800$\,m) & --- \\
 $r$ & 有效接收半径 & m & $R_\varphi$ & 旋转矩阵 & --- \\
+$a$ & 干扰源有效接收半径(未知) & m & $\mathcal{H}_1$ & 第一次观测后的联合可行集 & --- \\
+$F_1$ & 干扰源的可能位置区域 & --- & $a_{\min}(G)$ & 位置$G$处推断的最小接收半径 & m \\
+$C_{\mathrm{rec}}$ & 第二检测点可靠接收区域 & --- & $J(X)$ & 候选点最坏后验定位直径 & m \\
+$C_{\mathrm{good}}$ & 第二检测点候选区域 & --- & $\rho$ & 候选区域相对容差 & --- \\
 \end{longtable}
 
 % ==================== 模型准备 ====================
@@ -430,7 +438,194 @@ R_{\min}=\frac{d}{\sqrt{3}}.
 \end{figure}
 
 % ==================== 问题二 ====================
-\section{问题二：...}
+\section{问题二：AOA交会定位法的第二检测点选取}\label{sec:q2}
+
+\subsection{干扰源的可能位置区域}
+
+\subsubsection{环形角度距离}
+
+两个角度的环形距离定义为
+\begin{equation}
+d_\theta(\alpha,\beta)
+=
+\left|
+((\alpha-\beta+180^\circ)\bmod360^\circ)-180^\circ
+\right|.
+\end{equation}
+
+\subsubsection{联合可行集与位置投影}
+
+设第一次检测点为$S_1$，示向度为$\theta_1$。为了同时保留位置与固定未知接收半径之间的联系，定义联合可行集
+\begin{equation}\label{eq:H1}
+\mathcal{H}_1=
+\left\{
+(G,a):
+\begin{array}{l}
+G\in\Omega,\quad1000\leq a\leq1500,\\
+5\leq\|G-S_1\|\leq a,\\
+d_\theta(\arg(G-S_1),\theta_1)\leq\varepsilon
+\end{array}
+\right\}.
+\end{equation}
+
+位置投影为
+\begin{equation}
+F_1=\{G:\exists a,\ (G,a)\in\mathcal{H}_1\}.
+\end{equation}
+
+消去$a$后可写为
+\begin{equation}\label{eq:F1}
+F_1=
+\left\{
+G\in\Omega:
+5\leq\|G-S_1\|\leq1500,\
+d_\theta(\arg(G-S_1),\theta_1)\leq\varepsilon
+\right\}.
+\end{equation}
+
+$F_1$是示向扇形环带、半径$1500$米接收圆和目标圆域的交集，边界由射线段及圆弧组成。
+
+\subsection{第二检测点的可靠区域}
+
+\subsubsection{最小接收半径与可靠区域}
+
+第一次已经收到信号，说明在假设位置$G$下，实际接收半径至少为
+\begin{equation}\label{eq:amin}
+a_{\min}(G)=\max\{1000,\|G-S_1\|\}.
+\end{equation}
+
+为保证第二次仍能收到信号，第二检测点$X$必须对每个首次观测可行的联合假设都满足$\|X-G\|\leq a$。等价地，
+\begin{equation}\label{eq:C_rec}
+\boxed{
+C_{\mathrm{rec}}
+=
+\bigcap_{G\in F_1}
+B\!\left(G,a_{\min}(G)\right).
+}
+\end{equation}
+
+该区域利用了"同一干扰源的接收半径在两次观测中固定"这一信息。简单的保守区域
+\begin{equation}
+C_{\mathrm{rec}}^{(0)}
+=
+\bigcap_{G\in F_1}B(G,1000)
+\end{equation}
+满足$C_{\mathrm{rec}}^{(0)}\subseteq C_{\mathrm{rec}}$，但会舍弃一部分实际上能够保证接收的检测点。
+
+\subsubsection{数值可靠证书}
+
+数值计算不能只检查有限样本点。若用单元$Q_k$外包连续区域$F_1$，单元中心为$g_k$、覆盖半径为$h_k$，由$\|X-G\|\leq\|X-g_k\|+h_k$及$a_{\min}(G)\geq\max\{1000,\|g_k-S_1\|-h_k\}$可得充分可靠条件
+\begin{equation}\label{eq:cell_cert}
+\boxed{
+\|X-g_k\|+h_k
+\leq
+\max\{1000,\|g_k-S_1\|-h_k\},
+\quad\forall k.
+}
+\end{equation}
+随着边界单元自适应细化，该保守证书逐步逼近连续可靠区域。不能把"全部样本点都满足"直接当成连续保证。
+
+\subsection{定位质量指标}
+
+\subsubsection{后验位置区域}
+
+设$X\in C_{\mathrm{rec}}$。第二次观测可能返回near或某个示向度。若返回near，则后验位置区域为
+\begin{equation}\label{eq:F_near}
+F_X^{\mathrm{near}}=F_1\cap B(X,5).
+\end{equation}
+
+若返回示向度$\theta_2$，则direction本身说明目标不在$5$米闭圆内，后验联合假设为
+\begin{equation}\label{eq:H_theta2}
+\mathcal{H}_X^{\theta_2}
+=
+\left\{
+(G,a)\in\mathcal{H}_1:
+\begin{array}{l}
+\|G-X\|\leq a,\\
+\|G-X\|>5,\\
+d_\theta(\arg(G-X),\theta_2)\leq\varepsilon
+\end{array}
+\right\},
+\end{equation}
+其位置投影记为$F_X^{\theta_2}$。这一步明确采纳
+\begin{equation}\label{eq:subset}
+\boxed{
+F_X^{\theta_2}
+\subseteq F_1\setminus B(X,5),
+}
+\end{equation}
+避免把本应产生near的位置误留在direction后验中。
+
+\subsubsection{最坏后验直径指标}
+
+记候选点$X$上所有与当前假设相容的反馈集合为$\mathcal{O}(X)$。采用最坏后验定位直径作为稳健质量指标：
+\begin{equation}\label{eq:JX}
+\boxed{
+J(X)=\sup_{o\in\mathcal{O}(X)}D(F_X^o).
+}
+\end{equation}
+$J(X)$越小，说明无论真实位置、接收半径和第二次误差如何取值，第二次观测后的最大位置不确定性越小。
+
+\subsubsection{数值上下界与收敛判据}
+
+若后验区域被单元$Q_k\subseteq B(g_k,h_k)$保守覆盖，则其直径上界为
+\begin{equation}
+D_U
+=
+\max_{i,j}
+\left(\|g_i-g_j\|+h_i+h_j\right).
+\end{equation}
+在各单元中保存已严格验证可行的位置见证点$y_k$，可得下界
+\begin{equation}
+D_L
+=
+\max_{i,j}\|y_i-y_j\|.
+\end{equation}
+对near和全部相容的direction反馈区间分别计算上述上下界，取最坏反馈即得到$J_L,J_U$。只有在
+\begin{equation}
+0\leq J_U(X)-J_L(X)\leq\tau_J
+\end{equation}
+时，才能以精度$\tau_J$声明该点的质量已收敛。误差角、位置网格、边界网格和候选点网格应逐项细化，区分各自造成的数值误差。
+
+\subsubsection{特殊几何下的直径公式}
+
+在两站等距、真实源位于对称中心、零读数偏差且交会角恰为$90^\circ$的特殊几何中，定位区域直径的精确式为
+\begin{equation}\label{eq:D90}
+D_{90}=\sqrt{2}\,d\tan(2\varepsilon),
+\end{equation}
+其中$d$是测站到真实源的距离。当$\varepsilon$以弧度计且很小时，$D_{90}\approx2\sqrt{2}\,\varepsilon d$。该式只是小角近似，不能写成普遍的严格闭式解。对于完整选点问题，最优交会角由目标圆域、两站距离、读数误差、接收约束和移动代价共同决定，只能说优良交会角通常接近正交，不能断言恒为$90^\circ$。
+
+\subsection{候选区域与最终选择}
+
+\subsubsection{候选区域}
+
+在可靠区域内定义
+\begin{equation}
+J_{\min}=\inf_{X\in C_{\mathrm{rec}}}J(X).
+\end{equation}
+为避免绝对最优点过少，并为移动距离和后续搜索保留选择空间，引入相对容差$\rho>0$：
+\begin{equation}\label{eq:C_good}
+\boxed{
+C_{\mathrm{good}}
+=
+\{X\in C_{\mathrm{rec}}:
+J(X)\leq(1+\rho)J_{\min}\}.
+}
+\end{equation}
+
+若使用数值上下界，令$J_{\min,L}$为全局最优值的认证下界，$J_{\min,U}$为认证上界。为保证候选结论可靠，采用两级规则：$J_U(X)\leq(1+\rho)J_{\min,L}$作为保证入选条件；若$J_L(X)>(1+\rho)J_{\min,U}$，则可以保证淘汰。其余候选区域继续细化。第二检测点候选区域由连续不等式定义，不能退化成若干孤立采样点。
+
+\subsubsection{最终检测点选择}
+
+在候选区域中，以移动距离作为第二级目标：
+\begin{equation}\label{eq:S2}
+\boxed{
+S_2^\ast
+=
+\arg\min_{X\in C_{\mathrm{good}}}\|X-S_1\|.
+}
+\end{equation}
+这是一个词典序决策：先保证稳健定位质量接近最优，再减少从第一次检测点到第二点的移动时间。若存在对称解，选择与下一阶段搜索方向更一致的一侧；若仍并列，则按坐标词典序取唯一解，使算法完全确定。该选择不把"交会角等于$90^\circ$"写成硬约束，正交只用于生成有希望的候选点，最终仍由完整的$J(X)$、可靠接收条件和移动代价决定。
 
 
 % ==================== 问题三 ====================
