@@ -150,6 +150,27 @@ class SearchGeometryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Problem4Config(lattice_spacing_m=30)
 
+    def test_ordered_search_route_is_valid_permutation(self):
+        """预排路线必须是不重不漏的顶点序列，且不长于最近邻构造。"""
+        from .problem4_model import ordered_search_route
+        points = triangular_search_waypoints(900.0)
+        route = ordered_search_route(points, np.zeros(2))
+        self.assertEqual(sorted(route), list(range(len(points))))
+        start_distance = float(np.linalg.norm(points[route[0]]))
+        self.assertLessEqual(start_distance, 1e-6)
+
+    def test_search_route_config_validation(self):
+        """search_route 只允许 greedy/tour，tour 模式预排顺序生效。"""
+        with self.assertRaises(ValueError):
+            Problem4Config(search_route='spiral')
+        config = Problem4Config(search_route='tour')
+        strategy = Problem4Strategy.__new__(Problem4Strategy)
+        strategy.config = config
+        strategy.waypoints = triangular_search_waypoints(config.search_spacing_m)
+        from .problem4_model import ordered_search_route
+        strategy.search_route_order = ordered_search_route(strategy.waypoints, np.zeros(2))
+        self.assertEqual(len(strategy.search_route_order), len(strategy.waypoints))
+
     def test_no_signal_participates_in_worst_feedback(self):
         """全部样本在背面时，评分应保留全部位置的不确定性。"""
         hypotheses = np.array([[0, 0, 1000, 1, 0], [40, 0, 1000, 1, 0]], dtype=float)

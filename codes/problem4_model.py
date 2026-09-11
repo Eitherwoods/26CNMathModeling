@@ -239,6 +239,39 @@ class Problem4Knowledge:
         return np.asarray(rows, dtype=float)
 
 
+def ordered_search_route(waypoints, start):
+    """最近邻构造 + 2-opt 改进的 Hamilton 路，返回顶点下标访问顺序。
+
+覆盖证书只要求"每个顶点都被该频道扫描过"，访问顺序是自由度；
+此函数以路径长度最小化排序，供 search_route='tour' 模式使用。
+起点取距 start 最近的顶点（开局机器狗在原点）。纯排序，不改变
+顶点集合，因此不影响任意朝向可发现与覆盖余量两项几何证书。
+"""
+    points = np.asarray(waypoints, dtype=float)
+    count = len(points)
+    if count < 2:
+        return list(range(count))
+    start_index = int(np.argmin(np.linalg.norm(points - np.asarray(start, dtype=float), axis=1)))
+    remaining = list(range(count))
+    route = [remaining.pop(remaining.index(start_index))]
+    while remaining:
+        current = points[route[-1]]
+        distances = np.linalg.norm(points[remaining] - current, axis=1)
+        route.append(remaining.pop(int(np.argmin(distances))))
+    improved = True
+    while improved:
+        improved = False
+        for i in range(1, count - 2):
+            for j in range(i + 1, count - 1):
+                a, b = points[route[i - 1]], points[route[i]]
+                c, d = points[route[j]], points[route[j + 1]]
+                if (np.linalg.norm(b - a) + np.linalg.norm(d - c)
+                        > np.linalg.norm(c - a) + np.linalg.norm(d - b) + 1e-9):
+                    route[i:j + 1] = route[i:j + 1][::-1]
+                    improved = True
+    return route
+
+
 def triangular_search_waypoints(spacing_m=900, region_radius_m=TARGET_RADIUS_M):
     """保留半径R+b内的三角格顶点，覆盖所有与目标圆相交的三角形。
 

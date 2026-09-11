@@ -33,6 +33,8 @@ python -m unittest codes.test_problem2 -v
 - `protocol.py`：`RobotClient`、`RobotState`、显式开启的 `HttpTransport`。
 - `offline_stub.py`：串行、幂等缓存、计时、人工配置干扰源的确定性响应。
 - `run_robot.py`：默认离线；支持用户手动启动的演练，无正式模式选项。
+- `gui_autopilot.py`：演练 GUI 自动化（代启模拟器→登录→点演练→等接口就绪→跑 practice 命令→自动生成 TXT），2026-09-11 用户解除演练自动化禁令后新建；正式测试入口硬编码禁触。
+- `record_to_txt.py`：协议 JSONL + 任务记录 JSON → 逐动作行为记录 TXT（与 `output/Problem4/mission_p4_*.txt` 同格式）。
 - `credentials.py`：只解析本地凭据文件的参赛队号；不保存、传递或记录密码。
 - `strategy.py`：算法加载、上下文、会话开始与正常结束。
 - `strategy_demo.py`：附件的通信计时示例，不是问题3/4求解算法。
