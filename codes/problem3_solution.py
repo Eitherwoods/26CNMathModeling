@@ -91,6 +91,13 @@ class Problem3Config:
     # 保证性示向追踪：若已发现频道长期未被服务，则强制执行一次收缩上界的追踪动作。
     enable_guaranteed_tracking: bool = False
     tracking_debt_limit_rounds: int = 10
+    # 路线规划器：'greedy' 沿用最近必要站启发式；'dijkstra' 用插入启发式 + Dijkstra
+    # 距离优化收尾补证路线。
+    route_planner: str = 'greedy'
+    # 若计划移动距离超过该阈值，则在直线路径上采样中间检测点并择优停靠；
+    # 0 表示不启用。代价是 5 s 检测 + 可能 1 s 切换，必须能缩短后续行程才划算。
+    intermediate_stop_gap_m: float = 0.0
+    intermediate_stop_min_gain_m2: float = 2.0e5
 
 
 @dataclass
@@ -558,7 +565,10 @@ class Problem3Strategy:
             measures = measures[:max(1, self._search_cap())]
             if not measures:
                 continue
-            total_s = self._absence_route_seconds(waypoint, measures, active)
+            if self.config.route_planner == 'dijkstra':
+                total_s = self._dijkstra_absence_route_seconds(waypoint, measures, active)
+            else:
+                total_s = self._absence_route_seconds(waypoint, measures, active)
             if total_s < best_total_s:
                 best_total_s = total_s
                 best = StopPlan(
@@ -625,6 +635,81 @@ class Problem3Strategy:
             _, _, waypoint, channels = min(options, key=lambda item: (item[0], item[1]))
             visit(waypoint, channels)
         return float('inf')
+
+    def _dijkstra_absence_route_seconds(self, first_waypoint, first_measures, active_channels):
+        """用插入启发式 + Dijkstra 距离优化无信号补证路线。
+
+        与贪婪最近站不同，此处把「固定覆盖格点 + 首站」看成一个待访问序列，
+        每次把能覆盖最多残余掩码、且边际代价最低的点插入当前序列的最优位置。
+        序列内部相邻点之间的距离用 Dijkstra（本场景即欧氏直线）计算。
+        """
+        masks = {channel: self.channels[channel].mask.copy()
+                 for channel in active_channels}
+        simulated_channel = self.current_channel
+
+        def route_cost_and_gain(route):
+            """计算给定访问序列的总时间与最终覆盖收益（仅作比较，不求精确）。"""
+            pos = np.asarray(self.position, dtype=float)
+            chan = simulated_channel
+            total = 0.0
+            covered_cells = 0
+            for waypoint in route:
+                waypoint = np.asarray(waypoint, dtype=float)
+                total += float(np.linalg.norm(waypoint - pos)) / ROBOT_SPEED_MPS
+                reach = self._reach(waypoint)
+                channels = [c for c, m in masks.items() if np.any(m & reach)]
+                if not channels:
+                    channels = active_channels
+                ordered = sorted(set(channels), key=lambda c: (c != chan, c))
+                switches = sum(1 for i, c in enumerate(ordered) if i == 0 or c != ordered[i - 1])
+                total += MEASURE_TIME_S * len(ordered) + CHANNEL_SWITCH_TIME_S * switches
+                chan = ordered[-1] if ordered else chan
+                covered_cells += sum(int(np.count_nonzero(masks[c] & reach)) for c in active_channels)
+                pos = waypoint
+            return total, covered_cells
+
+        def insert_cost(route, idx, waypoint):
+            """把 waypoint 插入 route 的 idx 位置所带来的新增时间。"""
+            prev = route[idx - 1] if idx > 0 else np.asarray(self.position, dtype=float)
+            nxt = route[idx] if idx < len(route) else None
+            added = float(np.linalg.norm(waypoint - prev)) / ROBOT_SPEED_MPS
+            if nxt is not None:
+                added += float(np.linalg.norm(nxt - waypoint)) / ROBOT_SPEED_MPS
+                added -= float(np.linalg.norm(nxt - prev)) / ROBOT_SPEED_MPS
+            return added
+
+        def cells_gained(waypoint):
+            reach = self._reach(waypoint)
+            return sum(int(np.count_nonzero(masks[c] & reach)) for c in active_channels)
+
+        route = [np.asarray(first_waypoint, dtype=float)]
+        # 候选池：固定覆盖格点
+        pool = [np.asarray(w, dtype=float) for w in self.candidates]
+        for _ in range(len(self.candidates) + 1):
+            if not any(mask.any() for mask in masks.values()):
+                break
+            best, best_score = None, float('inf')
+            for waypoint in pool:
+                gain = cells_gained(waypoint)
+                if gain <= 0:
+                    continue
+                for idx in range(len(route) + 1):
+                    cost = insert_cost(route, idx, waypoint)
+                    # 目标：单位收益边际时间最小；加小量避免除以零。
+                    score = cost / (gain + 1.0)
+                    if score < best_score:
+                        best_score = score
+                        best = (idx, waypoint, gain)
+            if best is None:
+                break
+            idx, waypoint, gain = best
+            route.insert(idx, waypoint)
+            reach = self._reach(waypoint)
+            for c in active_channels:
+                masks[c] &= ~reach
+
+        total_s, _ = route_cost_and_gain(route)
+        return total_s
 
     def verify_coverage_completeness(self, margin_m=0.0):
         """离线自检：候选停靠点是否足以对任意源位置给出"无信号"或"发现"。
@@ -916,7 +1001,64 @@ class Problem3Strategy:
                 plan.target_channel))
             return due_tracking[0]
         options.sort(key=lambda plan: plan.score_s)
-        return options[0]
+        best = options[0]
+        # 若最优计划需要长距离移动，检查直线路径上是否有高价值中间停靠点。
+        intermediate = self._maybe_intermediate_plan(best)
+        return intermediate if intermediate is not None else best
+
+    def _maybe_intermediate_plan(self, plan):
+        """当计划移动距离较长时，在直线路径上采样中间点并择优停靠。
+
+        价值判据：中间点能覆盖的未知粗格网面积 >= 阈值，且带来的期望发现数
+        足以抵消额外的检测时间。若无可行中间点，返回 None，保持原 plan。
+        """
+        gap = self.config.intermediate_stop_gap_m
+        if gap <= 0.0:
+            return None
+        start = np.asarray(self.position, dtype=float)
+        target = np.asarray(plan.waypoint, dtype=float)
+        vector = target - start
+        length = float(np.linalg.norm(vector))
+        if length <= gap:
+            return None
+        # 沿直线按 gap 间隔采样，避开起点和终点。
+        n = int(np.floor(length / gap))
+        best, best_score = None, float('inf')
+        unit = vector / length
+        for k in range(1, n + 1):
+            waypoint = start + unit * (k * gap)
+            if np.hypot(*waypoint) > TARGET_RADIUS_M + 1e-9:
+                continue
+            active = [c for c, k in self.channels.items()
+                      if k.is_active and self._station_is_new(c, waypoint)]
+            if not active:
+                continue
+            measures = self._search_options(waypoint, 0.0, None)
+            measures = [c for c in measures if c in active]
+            if not measures:
+                continue
+            gain = self._measure_gain(measures, waypoint)
+            if gain < self.config.intermediate_stop_min_gain_m2:
+                continue
+            # 评估这个中间点：额外代价是偏离直线的折返 + 检测时间。
+            detour = (float(np.linalg.norm(waypoint - start))
+                      + float(np.linalg.norm(target - waypoint))
+                      - length) / ROBOT_SPEED_MPS
+            cost = detour + self._measure_cost_s(measures)
+            expected = self._expected_finds(
+                min(MAX_SOURCE_COUNT - len(self.cleared), len(active)), gain)
+            if expected <= 0.0:
+                continue
+            score = cost / expected
+            if score < best_score:
+                best_score = score
+                best = StopPlan('intermediate', waypoint, measures,
+                                self._travel_m(waypoint), score_s=score,
+                                note=f'长途移动中间检测：偏离{detour:.1f}s，期望发现{expected:.2f}')
+        # 只替换原 plan 当且仅当中间点的性价比优于原 plan。
+        if best is not None and best.score_s < plan.score_s:
+            return best
+        return None
 
     # --------------------------------------------------------- 决策3/4：执行
 
