@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .base_models import angular_distance_deg, bearing_deg, sampled_diameter
 from .config import (ANGLE_ERROR_DEG, MAX_RECEIVE_RADIUS_M, MIN_RECEIVE_RADIUS_M,
                      NEAR_DISTANCE_M, PROBLEM2_FIG_DIR, PROBLEM2_OUTPUT_DIR,
                      TARGET_RADIUS_M)
@@ -51,17 +52,6 @@ class Problem2Result:
     coverage_margin_m: float
     min_quality_m: float
     config: Problem2Config
-
-
-def bearing_deg(vectors: np.ndarray) -> np.ndarray:
-    """将二维向量转换到 [0, 360) 度方位角。"""
-    vectors = np.asarray(vectors, dtype=float)
-    return np.rad2deg(np.arctan2(vectors[..., 1], vectors[..., 0])) % 360.0
-
-
-def angular_distance_deg(first: np.ndarray, second: float | np.ndarray) -> np.ndarray:
-    """返回两个方位角的环形最小差值，正确处理 0 度跨越。"""
-    return np.abs((np.asarray(first) - np.asarray(second) + 180.0) % 360.0 - 180.0)
 
 
 def _unique_points(points: np.ndarray) -> np.ndarray:
@@ -144,41 +134,6 @@ def reliable_candidate_grid(boundary_points: np.ndarray, config: Problem2Config)
     margin = coverage_margin(config)
     distances = np.linalg.norm(candidates[:, None, :] - boundary_points[None, :, :], axis=2)
     return candidates[np.max(distances, axis=1) <= config.min_receive_radius_m - margin + 1e-9]
-
-
-def _convex_hull(points: np.ndarray) -> np.ndarray:
-    """使用单调链算法返回二维点集的凸包顶点。"""
-    points = np.unique(np.asarray(points, dtype=float), axis=0)
-    if len(points) <= 2:
-        return points
-    ordered = points[np.lexsort((points[:, 1], points[:, 0]))]
-
-    def cross(origin: np.ndarray, first: np.ndarray, second: np.ndarray) -> float:
-        """计算有向面积，用于剔除凸包内侧点。"""
-        first_vector = first - origin
-        second_vector = second - origin
-        return float(first_vector[0] * second_vector[1] - first_vector[1] * second_vector[0])
-
-    lower: list[np.ndarray] = []
-    for point in ordered:
-        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 1e-10:
-            lower.pop()
-        lower.append(point)
-    upper: list[np.ndarray] = []
-    for point in ordered[::-1]:
-        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 1e-10:
-            upper.pop()
-        upper.append(point)
-    return np.asarray(lower[:-1] + upper[:-1])
-
-
-def sampled_diameter(points: np.ndarray) -> float:
-    """计算有限采样定位集的直径；仅枚举凸包点对以减少重复计算。"""
-    hull = _convex_hull(points)
-    if len(hull) <= 1:
-        return 0.0
-    distances = np.linalg.norm(hull[:, None, :] - hull[None, :, :], axis=2)
-    return float(np.max(distances))
 
 
 def direction_result_points(possible_points: np.ndarray, station2: np.ndarray,

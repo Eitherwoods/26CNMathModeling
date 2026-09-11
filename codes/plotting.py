@@ -1,19 +1,13 @@
 # -*- coding: utf-8 -*-
-"""问题一几何证据图：测向布置、局部直径、覆盖反例。"""
+"""问题一、问题二的几何证据图：测向布置、局部直径、覆盖反例、候选区域。"""
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-from .config import DPI, ANGLE_ERROR_DEG
+from .config import DPI, ANGLE_ERROR_DEG, setup_matplotlib
 
 
 def plot_region(observations, result, truth, figures_dir, name, counterexample=False):
     """保存布局与局部区域两面板，反例中额外显示直径圆。"""
-    plt.rcParams.update({'font.sans-serif': ['Microsoft YaHei', 'SimHei', 'DejaVu Sans'],
-                         'axes.unicode_minus': False, 'svg.fonttype': 'none',
-                         'axes.spines.top': False, 'axes.spines.right': False,
-                         'legend.frameon': False, 'font.size': 9})
+    plt = setup_matplotlib()
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), layout='constrained')
     points = result.vertices
     for ax in axes:
@@ -45,10 +39,7 @@ def plot_region(observations, result, truth, figures_dir, name, counterexample=F
 
 def plot_problem2_regions(result, figures_dir):
     """绘制问题二的可能区域、可靠候选点和最终选择，并输出 PNG、SVG。"""
-    plt.rcParams.update({'font.sans-serif': ['Microsoft YaHei', 'SimHei', 'DejaVu Sans'],
-                         'axes.unicode_minus': False, 'svg.fonttype': 'none',
-                         'axes.spines.top': False, 'axes.spines.right': False,
-                         'legend.frameon': False, 'font.size': 9})
+    plt = setup_matplotlib()
     fig, ax = plt.subplots(figsize=(7.2, 6.4), layout='constrained')
     ax.add_patch(Circle((0, 0), result.config.target_radius_m, fill=False,
                         color='#555555', linestyle='--', label='目标区域边界'))
