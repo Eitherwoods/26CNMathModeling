@@ -24,6 +24,12 @@ python -m unittest codes.test_problem2 -v
 
 - `problem2_solution.py`：问题二的保守离散化候选区域与第二检测点求解器。
 - `test_problem2.py`：问题二角度、近距离、可靠性裕量与端到端验证。
+- `problem3_model.py`：问题三可能位置集合的栅格表示、保守更新算子、单频道判据与覆盖布站。
+- `problem3_solution.py`：问题三五项决策策略、统计汇总与离线命令行入口。
+- `strategy_p3.py`：问题三运行器入口适配（导出 `solve`）。
+- `scenario.py`：离线演练案例生成（随机/固定），不是官方案例分布。
+- `problem3_plotting.py`：问题三任务图（轨迹、可能区域收敛、动作时间构成）。
+- `test_problem3.py`：问题三栅格、覆盖式不存在性证明、清除判据与离线端到端测试。
 - `protocol.py`：`RobotClient`、`RobotState`、显式开启的 `HttpTransport`。
 - `offline_stub.py`：串行、幂等缓存、计时、人工配置干扰源的确定性响应。
 - `run_robot.py`：默认离线；支持用户手动启动的演练，无正式模式选项。
@@ -123,7 +129,8 @@ python -m codes.run_robot --mode practice --problem 3 --base-url http://127.0.0.
 
 运行链为 `run_robot → /enter → solve(context) → /exit`。
 协议层只负责通信，运行器负责调用算法；问题1/2的几何函数可由问题3/4算法调用，无需HTTP。
-后续分别新建 `codes/strategy_p3.py`、`codes/strategy_p4.py`，导出以下函数：
+后续求解算法各自新建 `codes/strategy_p3.py`（已实现）、`codes/strategy_p4.py`（待实现），
+统一导出 `solve(context)`。下面只是接口用法示例，不是完整策略：
 
 ```python
 def solve(context):
@@ -164,8 +171,25 @@ python -m codes.run_robot --mode offline --problem 3 --strategy codes.strategy_p
 
 确认算法可用后，把上面的演练命令中的 `--strategy codes.strategy_demo:solve`
 替换成 `--strategy codes.strategy_p3:solve`；问题4同理使用对应文件和编号。
-这两个求解文件尚未实现，当前可直接运行的是 `codes.strategy_demo:solve`。
+问题三的 `codes/strategy_p3.py` 已实现（转发到 `problem3_solution`）；
+问题四尚未实现，当前可直接运行的示例仍是 `codes.strategy_demo:solve`。
 `--strategy`会导入并执行本地Python代码，只填写自己信任的模块。
+
+## 问题三运行与自检
+
+问题三同样不依赖官方模拟器即可自检。模型与流程见 `solutions/problem3_flow.md`，
+建模审核结论与修正意见见 `solutions/REVIEW-Q3-2026-09-11.md`。
+
+```powershell
+python -m unittest codes.test_problem3 -v
+python -m codes.problem3_solution --seed 7 --sources 12
+python -m codes.problem3_solution --seed 7 --sources 12 --figures
+```
+
+命令行入口使用本地桩 `OfflineStub` 与 `codes/scenario.py` 生成的案例，
+统计量写入 `output/Problem3/`，`--figures` 时另存 `figures/Problem3/`。
+**这些统计量不是官方演练成绩**，只用于验证"模型 + 策略 + 桩 + 绘图"链路可用。
+按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
 
 ## 连接约束
 

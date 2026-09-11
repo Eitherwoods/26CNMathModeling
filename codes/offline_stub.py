@@ -19,12 +19,20 @@ class Source:
 
 
 class OfflineStub:
-    def __init__(self, robot_id='offline-team', sources=(), remaining=1200):
+    def __init__(self, robot_id='offline-team', sources=(), remaining=1200,
+                 latency_s=0.0, location_error_deg=0.0, error_cell_m=50.0):
         self.robot_id = robot_id
         if type(remaining) not in (int, float) or not math.isfinite(remaining) or not 0 <= remaining <= 1200:
             raise ValueError('remaining must be a finite number in 0..1200')
+        if type(latency_s) not in (int, float) or not math.isfinite(latency_s) or latency_s < 0:
+            raise ValueError('latency_s must be a non-negative finite number')
+        if not 0.0 <= location_error_deg <= 1.0:
+            raise ValueError('location_error_deg must lie in 0..1')
         self.sources = {s.channel: s for s in sources}
         self.remaining = remaining
+        self.latency_s = float(latency_s)
+        self.location_error_deg = float(location_error_deg)
+        self.error_cell_m = float(error_cell_m)
         self.phase = 'new'
         self.position = (0.0, 0.0)
         self.channel = 1
@@ -34,11 +42,23 @@ class OfflineStub:
         self.executed = 0
         self._lock = threading.Lock()
 
+    def location_error(self, position):
+        """同一地点误差固定、不同地点按统计规律变化的确定性实现（|误差| <= 设定值）。"""
+        if self.location_error_deg == 0.0:
+            return 0.0
+        cell_x = int(math.floor(position[0] / self.error_cell_m))
+        cell_y = int(math.floor(position[1] / self.error_cell_m))
+        hashed = (cell_x * 73856093) ^ (cell_y * 19349663)
+        return self.location_error_deg * (((hashed % 2001) - 1000) / 1000.0)
+
+
     def reply(self, status=200, accepted=False, **extra):
         return status, encode(dict(accepted=accepted, real_timestamp_ms=time.time_ns() // 1_000_000,
                                    virtual_time_s=self.virtual_us / 1e6 if accepted else 0, **extra))
 
     def __call__(self, path, body, timeout=5):
+        if self.latency_s:
+            time.sleep(self.latency_s)
         if not self._lock.acquire(blocking=False):
             return self.reply(409)
         try:
@@ -114,8 +134,10 @@ class OfflineStub:
                     extra = dict(measure_result='near')
                 else:
                     bearing = math.degrees(math.atan2(source.y - pos[1], source.x - pos[0]))
+                    error = source.bearing_error_deg + self.location_error(pos)
+                    error = max(-1.0, min(1.0, error))
                     extra = dict(measure_result='direction',
-                                 svd_deg=round((bearing + source.bearing_error_deg) % 360, 2) % 360)
+                                 svd_deg=round((bearing + error) % 360, 2) % 360)
             self.virtual_us += round(elapsed * 1e6)
             self.position = pos
         self.executed += 1

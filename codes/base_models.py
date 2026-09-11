@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""纯示向角域交会几何：半平面构造、区域分类、顶点和直径。
+"""公共几何：方位角、凸包、点集最小覆盖圆、示向角域距离，以及问题一的角域交会。
 
 坐标单位为米，角度为从东向逆时针旋转的度数。
-不将接收半径、目标圆域或近场无读数条件混入多边形定义。
+问题一的定位区域只由示向角域确定，不将接收半径、目标圆域或近场无读数条件混入多边形定义；
+问题三另用"示向角域距离"与栅格掩码处理带圆域约束的可能位置集合。
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -100,3 +101,169 @@ def solve_halfplanes(normals, offsets, tol=DISTANCE_TOL):
 def locate(observations, error_deg=ANGLE_ERROR_DEG):
     """从示向观测计算定位区域；不会自动添加人工包围框。"""
     return solve_halfplanes(*bearing_halfplanes(observations, error_deg))
+
+
+def bearing_deg(vectors):
+    """把二维向量（或向量数组）转换为 [0, 360) 度方位角。"""
+    vectors = np.asarray(vectors, dtype=float)
+    return np.rad2deg(np.arctan2(vectors[..., 1], vectors[..., 0])) % 360.0
+
+
+def angular_distance_deg(first, second):
+    """返回两个方位角之间的环形最小差值，正确处理 0 度跨越。"""
+    return np.abs((np.asarray(first) - np.asarray(second) + 180.0) % 360.0 - 180.0)
+
+
+def distance_to_ray(points, apex, direction):
+    """点到射线的欧氏距离（射线起点计入，投影为负时取起点）。"""
+    points = np.asarray(points, dtype=float)
+    direction = np.asarray(direction, dtype=float)
+    direction = direction / np.linalg.norm(direction)
+    offset = points - np.asarray(apex, dtype=float)
+    projection = np.maximum(offset @ direction, 0.0)
+    return np.linalg.norm(offset - projection[:, None] * direction, axis=1)
+
+
+def distance_to_wedge(points, apex, bearing, half_angle_deg):
+    """点到以 apex 为顶点、张角 2*half_angle_deg 的示向角域的欧氏距离。
+
+    角域是两条边界射线生成的凸锥，其边界由两条射线组成，
+    因此锥内距离为 0，锥外距离等于到两条边界射线距离的较小者。
+    """
+    points = np.asarray(points, dtype=float)
+    apex = np.asarray(apex, dtype=float)
+    if not np.isfinite(half_angle_deg) or not 0 < half_angle_deg < 90:
+        raise ValueError('角度半宽必须严格介于 0 和 90 度之间。')
+    offset = points - apex
+    axis = np.array([np.cos(np.deg2rad(bearing)), np.sin(np.deg2rad(bearing))])
+    normal = np.array([-axis[1], axis[0]])
+    along = offset @ axis
+    across = np.abs(offset @ normal)
+    inside = (along >= 0) & (across <= along * np.tan(np.deg2rad(half_angle_deg)) + 1e-12)
+    edges = [distance_to_ray(points, apex, [np.cos(np.deg2rad(bearing + sign * half_angle_deg)),
+                                            np.sin(np.deg2rad(bearing + sign * half_angle_deg))])
+             for sign in (-1.0, 1.0)]
+    return np.where(inside, 0.0, np.minimum(edges[0], edges[1]))
+
+
+def convex_hull(points):
+    """使用单调链算法返回二维点集的凸包顶点（逆时针，不含共线内点）。"""
+    points = np.unique(np.asarray(points, dtype=float), axis=0)
+    if len(points) <= 2:
+        return points
+    ordered = points[np.lexsort((points[:, 1], points[:, 0]))]
+
+    def cross(origin, first, second):
+        """计算有向面积，用于剔除凸包内侧点。"""
+        first_vector = first - origin
+        second_vector = second - origin
+        return float(first_vector[0] * second_vector[1] - first_vector[1] * second_vector[0])
+
+    lower: list[np.ndarray] = []
+    for point in ordered:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 1e-10:
+            lower.pop()
+        lower.append(point)
+    upper: list[np.ndarray] = []
+    for point in ordered[::-1]:
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 1e-10:
+            upper.pop()
+        upper.append(point)
+    return np.asarray(lower[:-1] + upper[:-1])
+
+
+def sampled_diameter(points):
+    """计算有限点集的直径；只枚举凸包点对以减少重复计算。"""
+    hull = convex_hull(points)
+    if len(hull) <= 1:
+        return 0.0
+    distances = np.linalg.norm(hull[:, None, :] - hull[None, :, :], axis=2)
+    return float(np.max(distances))
+
+
+def min_enclosing_circle(points, *, tolerance=1e-9, seed=0):
+    """返回二维点集的最小覆盖圆 (center, radius)。
+
+    最小覆盖圆只由凸包顶点决定，故先求凸包，再在凸包顶点上运行随机增量
+    （Welzl）算法。这样得到的是精确解：此前"迭代逼近 + 支撑点组合修正"的版本
+    在处理楔形等狭长点集时，会因支撑点筛选与实际支点不一致而给出偏大的半径
+    （实测楔形掩码上偏大 18%、圆心偏差 137 m），足以影响问题三的接近方向选择。
+
+    与问题一的直径圆的关系（Jung 定理）：
+        diam/2 <= r <= diam/sqrt(3)
+    即覆盖圆半径恒不小于直径的一半、不大于直径的 0.578 倍。
+    因此 `K_c = {X : R_c(X) <= 20}` 既不能用半径等于直径的"直径圆"来判定
+    （会过度保守），也不能用半直径圆来判定（对锐角分布会乐观失真）。
+    严格的覆盖结论一律由 `ChannelKnowledge.max_distance_m` 一类的显式上界给出。
+    """
+    unique = np.unique(np.asarray(points, dtype=float), axis=0)
+    if len(unique) == 0:
+        raise ValueError('最小覆盖圆至少需要一个点。')
+    if len(unique) == 1:
+        return unique[0].copy(), 0.0
+    hull = convex_hull(unique)
+    if len(hull) <= 2:
+        center = hull.mean(axis=0)
+        return center, float(np.max(np.linalg.norm(unique - center, axis=1)))
+    order = np.random.default_rng(seed).permutation(len(hull))
+    shuffled = hull[order]
+    circle = _two_point_circle(shuffled[0], shuffled[1])
+    for index in range(2, len(shuffled)):
+        if _inside_circle(shuffled[index], circle, tolerance):
+            continue
+        circle = _circle_through_boundary(shuffled[:index + 1], shuffled[index], tolerance)
+    return circle[0], float(np.max(np.linalg.norm(unique - circle[0], axis=1)))
+
+
+def _two_point_circle(first, second):
+    """以两点为直径的圆。"""
+    center = (first + second) / 2.0
+    return center, float(np.linalg.norm(first - center))
+
+
+def _inside_circle(point, circle, tolerance):
+    """判断点是否落在圆内（含容差）。"""
+    center, radius = circle
+    return float(np.linalg.norm(point - center)) <= radius * (1.0 + tolerance) + tolerance
+
+
+def _circle_through_boundary(points, boundary, tolerance):
+    """求覆盖 points 且经过 boundary 的小圆（Welzl 第二层）。"""
+    circle = _two_point_circle(points[0], boundary)
+    for index in range(1, len(points)):
+        if _inside_circle(points[index], circle, tolerance):
+            continue
+        circle = _circle_through_two_boundary(points[:index + 1], points[index], boundary, tolerance)
+    return circle
+
+
+def _circle_through_two_boundary(points, first, second, tolerance):
+    """求覆盖 points 且经过 first、second 的小圆（Welzl 第三层）。"""
+    circle = _two_point_circle(first, second)
+    for index in range(len(points)):
+        if _inside_circle(points[index], circle, tolerance):
+            continue
+        center = _circle_through(np.array([first, second, points[index]]))
+        if center is None:
+            # 三点接近共线时退化为最远两点确定的圆，保持覆盖性。
+            far = max((first, second, points[index]),
+                      key=lambda pair: float(np.linalg.norm(np.asarray(first) - np.asarray(pair))))
+            circle = _two_point_circle(np.asarray(first), np.asarray(far))
+            continue
+        circle = (center, float(np.linalg.norm(np.asarray(first) - center)))
+    return circle
+
+
+def _circle_through(points):
+    """返回经过 2 或 3 个点的圆圆心；退化时返回 None。"""
+    if len(points) == 2:
+        center = points.mean(axis=0)
+        if np.linalg.norm(points[0] - points[1]) == 0:
+            return None
+        return center
+    matrix = 2.0 * (points[1:] - points[0])
+    values = (points[1:] ** 2).sum(axis=1) - (points[0] ** 2).sum()
+    try:
+        return np.linalg.solve(matrix, values)
+    except np.linalg.LinAlgError:
+        return None
