@@ -28,13 +28,14 @@ from dataclasses import asdict, dataclass, field, replace
 
 import numpy as np
 
+from . import config as settings
 from .base_models import bearing_deg
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
                      MAX_SOURCE_COUNT,
-                     MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M, PROBLEM3_OUTPUT_DIR,
-                     ROBOT_SPEED_MPS, TARGET_RADIUS_M)
-from .problem3_model import ChannelKnowledge, Lattice, apply_direction
+                     MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M, ROBOT_SPEED_MPS,
+                     TARGET_RADIUS_M)
+from .problem3_model import ChannelKnowledge, Lattice, apply_direction, hex_waypoints
 from .strategy import BudgetReached
 
 TARGET_AREA_M2 = float(np.pi * TARGET_RADIUS_M ** 2)
@@ -48,14 +49,18 @@ class Problem3Config:
     planning_spacing_m: float = 50.0
     candidate_spacing_m: float = 1200.0
     candidate_radius_m: float = 1500.0
+    candidate_layout: str = 'grid9'
     lookahead_directions: int = 12
     lookahead_lengths_m: tuple = (250.0, 500.0, 900.0)
     lookahead_hypotheses: int = 10
     chase_options_limit: int = 4
     local_lookahead_limit_m: float = 300.0
     approach_direct_m: float = 400.0
+    # 追踪途中已经支付了移动代价，多测几个有价值频道通常比日后专程折返更省时。
     search_channels_per_stop: int = 3
     search_min_gain_m2: float = 5.0e4
+    # 一旦已经决定访问某个搜索停靠点，顺手完成该点全部正增益频道，避免日后折返。
+    fill_search_stops: bool = True
     endgame_seconds: float = 60.0
     search_risk_premium: float = 1.25
     speculative_clear_m: float = 45.0
@@ -73,10 +78,12 @@ class Problem3Config:
     # 不被零星毛刺引走（实测阈值过低会使行进反升）。
     backstop_min_hole_m2: float = 4.0e5
     backstop_max_stations: int = 12
-    # 停靠点回访惩罚：抑制收尾阶段在已服务区域之间反复横跳。
+    # 可选停靠点回访惩罚。同站补测开启后默认关闭，避免把仍有价值的近点推迟到
+    # 收尾阶段，形成跨场折返；保留参数便于关闭同站补测时做对照实验。
     revisit_radius_m: float = 400.0
-    revisit_penalty_s: float = 120.0
+    revisit_penalty_s: float = 0.0
     # 保证性示向追踪：若已发现频道长期未被服务，则强制执行一次收缩上界的追踪动作。
+    enable_guaranteed_tracking: bool = False
     tracking_debt_limit_rounds: int = 10
 
 
@@ -146,19 +153,23 @@ class Problem3Strategy:
         self.tracking_wait_rounds = {channel: 0 for channel in self.channels}
 
     def _build_candidates(self):
-        """搜索候选停靠点：只保留**落在目标圆域内**的格点。
+        """构造具有覆盖证明的搜索候选停靠点。
 
-        `Lattice.build(spacing, radius)` 会把格网扩到 `radius + 覆盖半径`，
-        于是半径 1500 的候选集里混进了 (0,±2400)、(±2400,0) 这四个点——
-        它们离目标区域边缘 600 m，检测不到任何区域内目标，却会被评分函数
-        当成"新增排除面积大"的候选，造成 2400 m 级的无效往返。
-        这里按题目给定的目标圆域半径直接滤掉。
+        默认使用九点方格方案；混合十五点与七点六边形方案保留用于消融测试。
         """
+        if self.config.candidate_layout == 'hex7':
+            return hex_waypoints(self.config.candidate_radius_m)
+        if self.config.candidate_layout not in ('grid9', 'hybrid15'):
+            raise ValueError(f'未知候选布局: {self.config.candidate_layout}')
         lattice = Lattice.build(self.config.candidate_spacing_m,
                                 self.config.candidate_radius_m)
         points = lattice.points
         inside = np.hypot(points[:, 0], points[:, 1]) <= TARGET_RADIUS_M + 1e-9
-        return points[inside]
+        grid9 = points[inside]
+        if self.config.candidate_layout == 'grid9':
+            return grid9
+        hex7 = hex_waypoints(self.config.candidate_radius_m)
+        return np.unique(np.round(np.vstack((grid9, hex7)), decimals=9), axis=0)
 
     # ------------------------------------------------------------- 工具方法
 
@@ -193,33 +204,6 @@ class Problem3Strategy:
         """
         return [channel for channel, knowledge in self.channels.items()
                 if knowledge.is_active and knowledge.observations]
-
-    def _unknown_channels(self):
-        """返回尚未确认存在、也未清除或排除的频道。"""
-        return [channel for channel, knowledge in self.channels.items()
-                if knowledge.status == 'unknown' and knowledge.is_active]
-
-    def _confirmed_source_count(self):
-        """返回已经由有效读数或清除结果确认存在的频道数。"""
-        return sum(knowledge.status in ('detected', 'cleared')
-                   for knowledge in self.channels.values())
-
-    def _unknown_source_probability(self):
-        """由源总数上下界给出未发现频道的共同存在概率估计。
-
-        这是搜索评分使用的显式均匀先验，不参与排除、可靠清除等严格结论。
-        返回值同时包含概率和剩余未知源数的上下界，便于记录与测试。
-        """
-        unknown_count = len(self._unknown_channels())
-        if unknown_count == 0:
-            return 0.0, 0, 0
-        confirmed = self._confirmed_source_count()
-        lower = max(0, 10 - confirmed)
-        upper = min(MAX_SOURCE_COUNT - confirmed, unknown_count)
-        if upper <= 0:
-            return 0.0, lower, upper
-        expected = 0.5 * (lower + upper)
-        return float(np.clip(expected / unknown_count, 0.0, 1.0)), lower, upper
 
     def _reach(self, waypoint):
         """候选停靠点的可检测格点集合（按停靠点缓存）。"""
@@ -318,9 +302,6 @@ class Problem3Strategy:
                                         note=f'频道{channel}已可证清除',
                                         target_channel=channel))
                 continue
-            guaranteed = self._guaranteed_tracking_plan(channel, knowledge)
-            if guaranteed is not None:
-                options.append(guaranteed)
             waypoint, note = self._chase_waypoint(channel, knowledge, limit)
             if waypoint is None or not self._station_is_new(channel, waypoint):
                 continue
@@ -497,13 +478,11 @@ class Problem3Strategy:
            "补齐最大连通空洞"为目标选点。
 
         关于覆盖完备性（`verify_coverage_completeness` 可离线验证）：
-        固定候选格网中在目标圆域内的 9 个点
-        （中心 + (±1200,0) + (0,±1200) + 四个对角点 (r=1697)）
-        对任意源位置的最坏距离为 **848.36 m**，小于有效接收半径下界 1000 m，
-        因此**若某频道在这 9 点全部无信号，则该频道确实不存在**——
+        默认九点候选对任意源位置的最坏距离小于有效接收半径下界
+        1000 m，因此**若某频道在全部候选点均无信号，则该频道确实不存在**——
         这是一条严格结论，不依赖轨迹偶然性。
 
-        第 3 段兜底仍然保留，理由是"9 点全测"要求该频道在每个点都被安排检测，
+        第 3 段兜底仍然保留，理由是"候选点全测"要求该频道在每个点都被安排检测，
         而每站只取 `search_channels_per_stop` 个未发现频道；当活跃频道很多、
         时间预算又紧时，`_search_cap` 会进一步收紧每站检测数，理论上存在
         "某频道凑不齐 9 点就被判终止"的窗口。兜底段是这一窗口的安全网，
@@ -528,7 +507,7 @@ class Problem3Strategy:
         返回 (完备?, 最坏距离m, 依据)。
         判据：目标圆域内任意点到最近候选点的距离 <= MIN_RECEIVE_RADIUS_M 时，
         该点的源在任何一次检测中都不可能被漏过（有效接收半径 >= 1000 m）。
-        因此"九点全测仍无信号"即为严格的不存在性证明。
+        因此"全部候选点均无信号"即为严格的不存在性证明。
         """
         from .config import MIN_RECEIVE_RADIUS_M
         # 在目标圆域上密采样，求到最近候选点的最大距离。
@@ -594,7 +573,7 @@ class Problem3Strategy:
             gain = self._measure_gain(measures, waypoint)
             if gain <= 0.0:
                 continue
-            expected = self._expected_finds(measures, waypoint)
+            expected = self._expected_finds(remaining_sources, gain)
             if expected <= 0.0:
                 continue
             follow_up = self._follow_up_seconds(waypoint) + self.config.endgame_seconds
@@ -656,12 +635,16 @@ class Problem3Strategy:
         for waypoint in self._candidate_waypoints():
             if not any(self._station_is_new(channel, waypoint) for channel in active):
                 continue
-            measures = self._search_options(waypoint, min_gain, None)
-            if not measures:
+            qualifying = self._search_options(waypoint, min_gain, None)
+            if not qualifying:
                 continue
+            # 选点仍由 `min_gain` 控制，防止为零星毛刺专程移动；但移动一旦确定，
+            # 额外测一个频道只需 5--6 秒，通常远小于日后数百秒的跨场折返。
+            measures = (self._search_options(waypoint, 0.0, None)
+                        if self.config.fill_search_stops else qualifying)
             measures = measures[:max(1, self._search_cap())]
             gain = self._measure_gain(measures, waypoint)
-            expected = self._expected_finds(measures, waypoint)
+            expected = self._expected_finds(remaining_sources, gain)
             if expected <= 0.0:
                 continue
             # 新发现干扰源的后续清除代价也要计入，否则会高估搜索的性价比。
@@ -708,27 +691,11 @@ class Problem3Strategy:
         """
         return np.vstack((np.asarray(self.position, dtype=float), self.candidates))
 
-    def _expected_finds(self, channels, waypoint):
-        """逐频道估计本次扫描能新发现的源数。
-
-        已发现频道只计检测成本和后验收紧价值，不再重复计作“新发现”；未发现频道
-        的存在概率由当前已确认源数及 10--16 个总数约束给出，空间命中概率则按该
-        频道当前可能区域中被停靠点可靠接收圆覆盖的比例计算。
-        """
-        source_probability, _, _ = self._unknown_source_probability()
-        if source_probability <= 0.0:
+    def _expected_finds(self, remaining_sources, gain_m2):
+        """均匀先验下的期望发现数：保持既有评分尺度，避免搜索/追击失衡。"""
+        if gain_m2 <= 0.0:
             return 0.0
-        expected = 0.0
-        for channel in channels:
-            knowledge = self.channels[channel]
-            if knowledge.status != 'unknown' or not knowledge.is_active:
-                continue
-            total_area = knowledge.possible_area_m2
-            if total_area <= 0.0:
-                continue
-            hit_probability = min(1.0, self._search_gain(channel, waypoint) / total_area)
-            expected += source_probability * hit_probability
-        return expected
+        return remaining_sources / CHANNEL_COUNT * gain_m2 / TARGET_AREA_M2
 
     def _follow_up_seconds(self, waypoint):
         """在 waypoint 新发现一个目标后，还需要多少移动时间。
@@ -765,7 +732,8 @@ class Problem3Strategy:
         represented = {plan.target_channel for plan in options
                        if plan.kind == 'guaranteed_track'}
         for channel, wait_rounds in self.tracking_wait_rounds.items():
-            if (wait_rounds < self.config.tracking_debt_limit_rounds
+            if (not self.config.enable_guaranteed_tracking
+                    or wait_rounds < self.config.tracking_debt_limit_rounds
                     or channel in represented
                     or not self.channels[channel].is_active):
                 continue
@@ -1075,19 +1043,29 @@ def run_mission(context, config=None):
     return Problem3Strategy(context, config).run()
 
 
+def is_offline_run(context):
+    """判断本次会话是否使用本地桩，防止离线结果混入在线成绩目录。"""
+    from .offline_stub import OfflineStub
+    return isinstance(getattr(context.client, 'transport', None), OfflineStub)
+
+
 def solve(context):
-    """供运行器加载的算法入口：执行策略并回报汇总（记录写盘失败不影响任务）。"""
+    """供运行器加载的算法入口，并按在线/离线类型分别保存任务记录。"""
     record = run_mission(context)
     summary = summarize(record)
+    offline = is_offline_run(context)
     try:
-        PROBLEM3_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        target_dir = settings.record_dir_for(context.problem, offline=offline)
+        target_dir.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime('%Y%m%d-%H%M%S')
-        target = PROBLEM3_OUTPUT_DIR / f'mission_p{context.problem}_{stamp}.json'
+        prefix = 'offline-' if offline else ''
+        target = target_dir / f'{prefix}mission_p{context.problem}_{stamp}.json'
         target.write_text(json.dumps({'summary': summary, 'record': record},
                                      ensure_ascii=False, indent=2), encoding='utf-8')
         summary['record_path'] = str(target)
-    except OSError:
+    except OSError as exc:
         summary['record_path'] = None
+        summary['record_error'] = str(exc)
     return summary
 
 
