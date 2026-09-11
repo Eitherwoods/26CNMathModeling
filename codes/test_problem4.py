@@ -22,9 +22,9 @@ from .config import (MIN_RECEIVE_RADIUS_M, PROBLEM4_OUTPUT_DIR, PROTOCOL_LOG_DIR
 from .offline_stub import OfflineStub, Source
 from .problem3_model import Lattice
 from .problem4_model import Problem4Knowledge, triangular_search_waypoints
-from .problem4_solution import (Problem4Config, Problem4Strategy, build_scenario,
-                                feedback_score, is_offline_run, main, run_mission,
-                                solve, summarize)
+from .problem4_solution import (Problem4Config, Problem4Strategy, StopPlan,
+                                build_scenario, feedback_score, is_offline_run,
+                                main, run_mission, solve, summarize)
 from .protocol import HttpTransport, RobotClient
 from .scenario import fixed_scenario
 from .scenario_p4 import boundary_scenario, mixed_scenario
@@ -150,6 +150,27 @@ class SearchGeometryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Problem4Config(lattice_spacing_m=30)
 
+    def test_ordered_search_route_is_valid_permutation(self):
+        """预排路线必须是不重不漏的顶点序列，且不长于最近邻构造。"""
+        from .problem4_model import ordered_search_route
+        points = triangular_search_waypoints(900.0)
+        route = ordered_search_route(points, np.zeros(2))
+        self.assertEqual(sorted(route), list(range(len(points))))
+        start_distance = float(np.linalg.norm(points[route[0]]))
+        self.assertLessEqual(start_distance, 1e-6)
+
+    def test_search_route_config_validation(self):
+        """search_route 只允许 greedy/tour，tour 模式预排顺序生效。"""
+        with self.assertRaises(ValueError):
+            Problem4Config(search_route='spiral')
+        config = Problem4Config(search_route='tour')
+        strategy = Problem4Strategy.__new__(Problem4Strategy)
+        strategy.config = config
+        strategy.waypoints = triangular_search_waypoints(config.search_spacing_m)
+        from .problem4_model import ordered_search_route
+        strategy.search_route_order = ordered_search_route(strategy.waypoints, np.zeros(2))
+        self.assertEqual(len(strategy.search_route_order), len(strategy.waypoints))
+
     def test_no_signal_participates_in_worst_feedback(self):
         """全部样本在背面时，评分应保留全部位置的不确定性。"""
         hypotheses = np.array([[0, 0, 1000, 1, 0], [40, 0, 1000, 1, 0]], dtype=float)
@@ -213,6 +234,27 @@ class StrategyEvidenceTests(unittest.TestCase):
         for bad in (0, -3, True):
             with self.assertRaises(ValueError):
                 Problem4Config(fairness_age_rounds=bad)
+
+    def test_finish_detected_switch_must_be_boolean(self):
+        """连续处理开关不能接受会被误当作真假的数值。"""
+        with self.assertRaises(ValueError):
+            Problem4Config(finish_detected_before_search=1)
+
+    def test_detected_target_postpones_search_and_search_resumes(self):
+        """目标未清除时连续追踪，清除后仍恢复原覆盖计划。"""
+        self.strategy.round = 4
+        self.strategy.channels[1].status = 'detected'
+        track = StopPlan(np.array([100.0, 0.0]), 'track', channel=1)
+        search = StopPlan(np.array([900.0, 0.0]), 'search', search_index=0)
+        with (mock.patch.object(self.strategy, '_search_plan', return_value=search),
+              mock.patch.object(self.strategy, '_tracking_plan', return_value=track),
+              mock.patch.object(self.strategy, '_next_channel', return_value=1)):
+            _, selected = self.strategy.decide_direction()
+        self.assertIs(selected, track)
+        self.strategy.channels[1].mark_cleared()
+        with mock.patch.object(self.strategy, '_search_plan', return_value=search):
+            _, selected = self.strategy.decide_direction()
+        self.assertIs(selected, search)
 
 
 class LocalProtocolTests(unittest.TestCase):

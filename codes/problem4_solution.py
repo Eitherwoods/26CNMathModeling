@@ -21,7 +21,8 @@ import numpy as np
 from . import config as settings
 from .problem3_model import Lattice
 from .problem3_solution import summarize as summarize_base
-from .problem4_model import Problem4Knowledge, triangular_search_waypoints
+from .problem4_model import (Problem4Knowledge, ordered_search_route,
+                             triangular_search_waypoints)
 from .strategy import BudgetReached
 
 
@@ -35,12 +36,14 @@ class Problem4Config:
     radius_bins: int = settings.PROBLEM4_RADIUS_BINS
     hypothesis_limit: int = settings.PROBLEM4_HYPOTHESIS_LIMIT
     search_interval: int = settings.PROBLEM4_SEARCH_INTERVAL
+    finish_detected_before_search: bool = settings.PROBLEM4_FINISH_DETECTED_BEFORE_SEARCH
     tracking_limit: int = settings.PROBLEM4_TRACKING_LIMIT
     fairness_age_rounds: int = settings.PROBLEM4_FAIRNESS_AGE_ROUNDS
     max_rounds: int = settings.PROBLEM4_MAX_ROUNDS
     info_threshold: float = settings.PROBLEM4_INFO_THRESHOLD
     exit_reserve_s: float = settings.PROBLEM4_EXIT_RESERVE_S
     step_lengths_m: tuple = settings.PROBLEM4_STEP_LENGTHS_M
+    search_route: str = settings.PROBLEM4_SEARCH_ROUTE
 
     def __post_init__(self):
         """在任何动作之前拒绝破坏几何保证或调度活性的参数。"""
@@ -59,6 +62,10 @@ class Problem4Config:
             raise ValueError('退出预留时间必须非负且有限。')
         if not self.step_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.step_lengths_m):
             raise ValueError('候选步长必须为正的有限值。')
+        if not isinstance(self.finish_detected_before_search, bool):
+            raise ValueError('连续追踪开关必须为布尔值。')
+        if self.search_route not in ('greedy', 'tour'):
+            raise ValueError("搜索路线只允许 'greedy' 或 'tour'。")
 
 
 @dataclass
@@ -115,6 +122,8 @@ class Problem4Strategy:
         self.started_at = time.monotonic()
         self.lattice = Lattice.build(self.config.lattice_spacing_m)
         self.waypoints = triangular_search_waypoints(self.config.search_spacing_m)
+        self.search_route_order = (ordered_search_route(self.waypoints, np.zeros(2))
+                                   if self.config.search_route == 'tour' else None)
         self.channels = {c: Problem4Knowledge(c, self.lattice,
                          orientation_bins=self.config.orientation_bins,
                          radius_bins=self.config.radius_bins)
@@ -156,13 +165,21 @@ class Problem4Strategy:
         return [c for c, knowledge in self.channels.items() if knowledge.status == 'detected']
 
     def _search_plan(self):
-        """选择尚欠至少一个未知频道的最近网格顶点，保证覆盖进度单调。"""
+        """选择尚欠至少一个未知频道的网格顶点，保证覆盖进度单调。
+
+greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先后次序
+取第一个未覆盖顶点——顶点集合不变，覆盖证据与完成判据不受影响。
+"""
         unknown = [c for c, k in self.channels.items() if k.status == 'unknown']
         candidates = [i for i in range(len(self.waypoints))
                       if any(i not in self.coverage[c] for c in unknown)]
         if not candidates:
             return None
-        index = min(candidates, key=lambda i: np.linalg.norm(self.waypoints[i] - self.position))
+        if self.search_route_order is not None:
+            rank = {index: order for order, index in enumerate(self.search_route_order)}
+            index = min(candidates, key=lambda i: rank[i])
+        else:
+            index = min(candidates, key=lambda i: np.linalg.norm(self.waypoints[i] - self.position))
         return StopPlan(self.waypoints[index].copy(), 'search', search_index=index)
 
     def _tracking_candidates(self, knowledge):
@@ -246,12 +263,18 @@ class Problem4Strategy:
         return min(detected, key=lambda c: (self._channel_travel_m(c), self.last_served[c], c))
 
     def decide_direction(self):
-        """第一项决策输出方向及任务依据，覆盖和已知频道均不会被永久搁置。"""
+        """第一项决策输出方向，并优先连续处理已发现目标。
+
+        单个目标最多经历有限次追踪，随后进入每次均删除位置单元的后备清除，
+        所以连续处理必然结束；目标处理完毕后恢复三角网格覆盖，无需周期性跨区折返。
+        """
         search = self._search_plan()
         detected = self._detected()
         if self.round == 0:
             plan = StopPlan(self.position.copy(), 'initial')
-        elif search is not None and (not detected or self.round % self.config.search_interval == 0):
+        elif (search is not None and
+              (not detected or (not self.config.finish_detected_before_search
+                                and self.round % self.config.search_interval == 0))):
             plan = search
         elif detected:
             plan = self._tracking_plan(self._next_channel(detected))
