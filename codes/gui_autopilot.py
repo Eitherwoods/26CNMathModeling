@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import re
 import socket
 import subprocess
 import sys
@@ -86,7 +87,8 @@ def _poke_accessibility(hwnd: int):
 
 
 def attach(wait_s: float = 60.0):
-    """附加模拟器窗口并激活无障碍树；必要时代启模拟器。"""
+    """附加模拟器窗口并激活无障碍树；必要时代启模拟器。
+    窗口最小化时 WebView2 子窗口全部隐藏、无障碍树塌缩，须先恢复。"""
     deadline = time.time() + wait_s
     while time.time() < deadline:
         hwnd = _main_hwnd()
@@ -97,6 +99,9 @@ def attach(wait_s: float = 60.0):
             subprocess.Popen([str(SIM_EXE)], cwd=str(TESTER_DIR))
             time.sleep(4.0)
             continue
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+            time.sleep(1.0)
         _poke_accessibility(hwnd)
         for w in Desktop(backend="uia").windows():
             if w.window_text() == SIM_TITLE:
@@ -247,8 +252,10 @@ def start_drill(win, audit: Audit, problem: int) -> str:
 
 
 def wait_interface_ready(win, audit: Audit, timeout: float = 180.0) -> str:
-    """轮询「就绪」字样或模拟器端口开放；返回判定依据。"""
+    """等接口就绪：优先等页面出现「就绪」字样（覆盖5秒倒计时），
+    端口开放只作兜底并追加缓冲，避免倒计时内 /enter 被中止。"""
     deadline = time.time() + timeout
+    port_open_at = None
     while time.time() < deadline:
         try:
             win = attach(wait_s=5)
@@ -258,13 +265,18 @@ def wait_interface_ready(win, audit: Audit, timeout: float = 180.0) -> str:
         text = page_text(win)
         if "就绪" in text:
             audit.step(win, "interface-ready", {"evidence": "页面出现「就绪」"})
+            time.sleep(1.0)
             return "text"
         with socket.socket() as sk:
             sk.settimeout(1.0)
             if sk.connect_ex(("127.0.0.1", SIM_PORT)) == 0:
-                audit.step(win, "interface-ready", {"evidence": f"端口 {SIM_PORT} 开放"})
-                return "port"
-        time.sleep(2.0)
+                if port_open_at is None:
+                    port_open_at = time.time()
+                elif time.time() - port_open_at >= 8.0:
+                    audit.step(win, "interface-ready",
+                               {"evidence": f"端口 {SIM_PORT} 已开放 8s（未见「就绪」字样）"})
+                    return "port"
+        time.sleep(1.5)
     raise AutopilotError(f"{timeout:.0f}s 内接口未就绪，请人工查看模拟器界面")
 
 
@@ -282,10 +294,133 @@ def build_run_command(problem: int) -> list[str]:
     return tokens
 
 
-def run_robot(problem: int) -> int:
+def run_robot(problem: int):
+    """执行演练命令，返回 CompletedProcess（stdout 含 record_path）。"""
     cmd = build_run_command(problem)
     print("[run_robot]", " ".join(cmd))
-    return subprocess.call(cmd, cwd=str(PROJECT_ROOT))
+    result = subprocess.run(cmd, cwd=str(PROJECT_ROOT), capture_output=True,
+                            text=True, encoding="utf-8", errors="replace")
+    sys.stdout.write(result.stdout or "")
+    if result.stderr:
+        sys.stderr.write(result.stderr)
+    return result
+
+
+def read_latest_case_counts(problem: int) -> str | None:
+    """读取问题N最新一局的案例规模描述（失败返回 None）。
+    优先读会话结束页的「本次演练测试干扰源数量」（分段 Text）；
+    否则回导航页刷新历史表格，读最新一行的 DataItem。"""
+    from codes.record_to_txt import COUNTS_RE, counts_from_text
+
+    def counts_from_summary_page(els) -> str | None:
+        names = [(el.element_info.control_type,
+                  (el.element_info.name or "").strip()) for el in els]
+        for i, (ctype, name) in enumerate(names):
+            if ctype == "Text" and name == "本次演练测试干扰源数量":
+                nums = []
+                for ctype2, name2 in names[i + 1:i + 9]:
+                    if name2.isdigit():
+                        nums.append(name2)
+                    if len(nums) == 3:
+                        break
+                if len(nums) == 3:
+                    total, omni, directional = nums
+                    return f"共{total}个， 全向{omni}个， 定向{directional}个"
+        return None
+
+    def find_counts_in_history(els) -> str | None:
+        names = [(el.element_info.control_type,
+                  (el.element_info.name or "").strip()) for el in els]
+        anchor = None
+        for i, (ctype, name) in enumerate(names):
+            if ctype == "Text" and name == f"问题{problem}演练测试":
+                anchor = i
+        if anchor is None:
+            return None
+        for ctype, name in names[anchor:anchor + 120]:
+            if ctype == "DataItem" and COUNTS_RE.search(name):
+                return counts_from_text(name)
+        return None
+
+    def click_nav():
+        for el in all_controls(win):
+            try:
+                if el.element_info.control_type == "Button" \
+                        and el.element_info.name == "演练测试":
+                    el.invoke()
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def click_refresh_all():
+        for el in all_controls(win):
+            try:
+                if el.element_info.control_type == "Button" \
+                        and el.element_info.name == "刷新历史行为日志":
+                    el.invoke()
+            except Exception:
+                continue
+
+    try:
+        win = attach(wait_s=10)
+    except AutopilotError:
+        return None
+    try:
+        els = all_controls(win)
+        counts = counts_from_summary_page(els)
+        if counts:
+            return counts
+        click_refresh_all()
+        time.sleep(2.5)
+        win = attach(wait_s=10)
+        counts = find_counts_in_history(all_controls(win))
+        if counts:
+            return counts
+        if click_nav():
+            time.sleep(2.0)
+            win = attach(wait_s=10)
+            click_refresh_all()
+            time.sleep(2.5)
+            win = attach(wait_s=10)
+            counts = find_counts_in_history(all_controls(win))
+        return counts
+    except Exception:
+        return None
+
+
+def post_run_txt(problem: int, run_stdout: str) -> Path | None:
+    """演练结束后自动生成与任务记录同名的逐动作 TXT。失败不阻断主流程。"""
+    try:
+        return _post_run_txt(problem, run_stdout)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[autopilot] TXT 生成失败（不影响演练本身）: {exc}")
+        return None
+
+
+def _post_run_txt(problem: int, run_stdout: str) -> Path | None:
+    from codes.record_to_txt import convert
+
+    match = re.search(r'"record_path":\s*"([^"]+)"', run_stdout)
+    if not match:
+        print("[autopilot] 未从输出解析到 record_path，跳过 TXT 生成")
+        return None
+    record = Path(match.group(1))
+    line = (TESTER_DIR / f"runq{problem}.txt").read_text(encoding="utf-8").strip()
+    tokens = line.split()
+    jsonl = None
+    if "--log" in tokens:
+        jsonl = PROJECT_ROOT / tokens[tokens.index("--log") + 1]
+    if jsonl is None or not jsonl.exists():
+        print("[autopilot] 未找到协议 JSONL，跳过 TXT 生成")
+        return None
+    counts = read_latest_case_counts(problem)
+    if counts:
+        print("[autopilot] 案例规模:", counts)
+    else:
+        print("[autopilot] 未能从界面读取案例规模，TXT 首行将省略")
+    out = convert(jsonl, record, -1, counts, record.with_suffix(".txt"))
+    return out
 
 
 # ---------------------------------------------------------------- 子命令
@@ -312,18 +447,57 @@ def cmd_drill(args):
 
 
 def cmd_run(args):
-    raise SystemExit(run_robot(args.problem))
+    result = run_robot(args.problem)
+    post_run_txt(args.problem, result.stdout or "")
+    if result.returncode:
+        raise SystemExit(result.returncode)
+
+
+def back_to_drill_list(win, audit: Audit, problem: int):
+    """从会话结束页回到演练列表页，确保「开始问题N演练测试」按钮可见。"""
+    target = drill_button_name(problem)
+    for attempt in range(4):
+        win = attach(wait_s=10)
+        buttons = [el for el in all_controls(win)
+                   if el.element_info.control_type == "Button"
+                   and el.element_info.name == target]
+        if buttons:
+            return win
+        # 会话页：优先「返回演练测试」；否则主导航「演练测试」
+        clicked = False
+        for name in ("返回演练测试", "演练测试"):
+            for el in all_controls(win):
+                try:
+                    if el.element_info.control_type == "Button" \
+                            and el.element_info.name == name:
+                        el.invoke()
+                        clicked = True
+                        break
+                except Exception:
+                    continue
+            if clicked:
+                break
+        audit.step(win, f"back-to-list-{attempt}", {"clicked": clicked})
+        time.sleep(2.5)
+    raise AutopilotError("无法回到演练列表页（找不到 " + target + "）")
 
 
 def cmd_full(args):
-    win = attach()
     audit = Audit()
-    do_login_if_needed(win, audit)
-    win = attach()
-    dismiss_announcement(win, audit)
-    start_drill(win, audit, args.problem)
-    wait_interface_ready(win, audit)
-    raise SystemExit(run_robot(args.problem))
+    for round_no in range(1, args.rounds + 1):
+        print(f"[autopilot] ===== 第 {round_no}/{args.rounds} 局（问题{args.problem}）=====")
+        win = attach()
+        do_login_if_needed(win, audit)
+        win = attach()
+        dismiss_announcement(win, audit)
+        if round_no > 1:
+            win = back_to_drill_list(win, audit, args.problem)
+        start_drill(win, audit, args.problem)
+        wait_interface_ready(win, audit)
+        result = run_robot(args.problem)
+        post_run_txt(args.problem, result.stdout or "")
+        if result.returncode:
+            raise SystemExit(result.returncode)
 
 
 def main():
@@ -333,6 +507,9 @@ def main():
     for name, fn in (("drill", cmd_drill), ("run", cmd_run), ("full", cmd_full)):
         p = sub.add_parser(name)
         p.add_argument("--problem", type=int, choices=(3, 4), required=True)
+        if name == "full":
+            p.add_argument("--rounds", type=int, default=1,
+                           help="连续演练局数（每局结束自动开下一局）")
         p.set_defaults(fn=fn)
     args = parser.parse_args()
     if args.cmd == "discover":

@@ -21,7 +21,8 @@ import numpy as np
 from . import config as settings
 from .problem3_model import Lattice
 from .problem3_solution import summarize as summarize_base
-from .problem4_model import Problem4Knowledge, triangular_search_waypoints
+from .problem4_model import (Problem4Knowledge, ordered_search_route,
+                             triangular_search_waypoints)
 from .strategy import BudgetReached
 
 
@@ -42,6 +43,7 @@ class Problem4Config:
     info_threshold: float = settings.PROBLEM4_INFO_THRESHOLD
     exit_reserve_s: float = settings.PROBLEM4_EXIT_RESERVE_S
     step_lengths_m: tuple = settings.PROBLEM4_STEP_LENGTHS_M
+    search_route: str = settings.PROBLEM4_SEARCH_ROUTE
 
     def __post_init__(self):
         """在任何动作之前拒绝破坏几何保证或调度活性的参数。"""
@@ -62,6 +64,8 @@ class Problem4Config:
             raise ValueError('候选步长必须为正的有限值。')
         if not isinstance(self.finish_detected_before_search, bool):
             raise ValueError('连续追踪开关必须为布尔值。')
+        if self.search_route not in ('greedy', 'tour'):
+            raise ValueError("搜索路线只允许 'greedy' 或 'tour'。")
 
 
 @dataclass
@@ -118,6 +122,8 @@ class Problem4Strategy:
         self.started_at = time.monotonic()
         self.lattice = Lattice.build(self.config.lattice_spacing_m)
         self.waypoints = triangular_search_waypoints(self.config.search_spacing_m)
+        self.search_route_order = (ordered_search_route(self.waypoints, np.zeros(2))
+                                   if self.config.search_route == 'tour' else None)
         self.channels = {c: Problem4Knowledge(c, self.lattice,
                          orientation_bins=self.config.orientation_bins,
                          radius_bins=self.config.radius_bins)
@@ -159,13 +165,21 @@ class Problem4Strategy:
         return [c for c, knowledge in self.channels.items() if knowledge.status == 'detected']
 
     def _search_plan(self):
-        """选择尚欠至少一个未知频道的最近网格顶点，保证覆盖进度单调。"""
+        """选择尚欠至少一个未知频道的网格顶点，保证覆盖进度单调。
+
+greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先后次序
+取第一个未覆盖顶点——顶点集合不变，覆盖证据与完成判据不受影响。
+"""
         unknown = [c for c, k in self.channels.items() if k.status == 'unknown']
         candidates = [i for i in range(len(self.waypoints))
                       if any(i not in self.coverage[c] for c in unknown)]
         if not candidates:
             return None
-        index = min(candidates, key=lambda i: np.linalg.norm(self.waypoints[i] - self.position))
+        if self.search_route_order is not None:
+            rank = {index: order for order, index in enumerate(self.search_route_order)}
+            index = min(candidates, key=lambda i: rank[i])
+        else:
+            index = min(candidates, key=lambda i: np.linalg.norm(self.waypoints[i] - self.position))
         return StopPlan(self.waypoints[index].copy(), 'search', search_index=index)
 
     def _tracking_candidates(self, knowledge):
