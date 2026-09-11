@@ -195,6 +195,11 @@ W_i=H_{i,1}\cap H_{i,2}.
 
 此外，$P$ 的边界均来自有限条示向角域边界直线。因此，在交会条件能够形成非空有界区域时，$P$ 是一个有界凸多边形。该结论也是后续按照极角排列顶点以及使用旋转卡壳法的依据。
 
+\begin{proposition}[定位区域的凸性]\label{prop:convex-region}
+设 $W_i$ 为第 $i$ 个检测点对应的示向角域，则定位区域
+$P=\bigcap_{i=1}^{m}W_i$ 为凸集；当 $P$ 非空且有界时，$P$ 为凸多边形，可退化为点或线段。
+\end{proposition}
+
 \subsubsection{定位区域的顶点提取}
 
 每个示向角域 $W_i$ 由两条边界射线确定。将所有边界射线所在的直线组成集合，共得到 $2m$ 条候选边界直线。定位区域的每个顶点都必然是其中两条非平行边界直线的交点，因此可以通过以下步骤确定多边形顶点：
@@ -311,6 +316,13 @@ A=(1-t)U+tV.
 |V-B|=D.
 \end{equation}
 于是可以将 $A$ 替换为某个顶点而不改变区域直径。对 $B$ 重复上述过程，也可以将其替换为某个顶点。因此，多边形区域的直径一定可以由一对顶点取得。
+
+\begin{proposition}[直径的顶点可达性]\label{prop:diameter-vertices}
+设有界多边形区域 $P$ 的顶点依次为 $V_1,\ldots,V_n$，则
+\[
+D(P)=\max_{1\le i<j\le n}\|V_i-V_j\|.
+\]
+\end{proposition}
 
 \subsubsection{区域直径的计算}
 
@@ -518,6 +530,11 @@ R_{\min}=\frac{d}{\sqrt{3}}.
 \end{equation}
 一致。
 
+\begin{proposition}[直径圆非普遍覆盖]\label{prop:diameter-circle}
+以定位区域一对最远顶点为直径端点的圆不一定覆盖整个定位区域。
+因此，“以定位区域直径为直径的圆”不具有普遍覆盖性。
+\end{proposition}
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.7\textwidth]{../figures/Problem1/triangle.png}
@@ -577,6 +594,13 @@ C_{\mathrm{rec}}^{(0)} = \bigcap_{G \in F_1} B(G, 1000) \subseteq C_{\mathrm{rec
 \|X - g_k\| + h_k \le \max\{1000,\ \|g_k - S_1\| - h_k\}, \quad \forall k.
 \end{equation}
 随着边界单元自适应细化，该保守证书逐步逼近连续可靠区域。不能把“全部样本点都满足”直接当成连续保证。
+
+\begin{proposition}[可靠接收区域的包含关系]\label{prop:Crec}
+设 $C_{\mathrm{rec}}$ 与 $C_{\mathrm{rec}}^{(0)}$ 分别为利用与未利用接收半径固定性的第二检测点可靠接收区域，则
+\[
+C_{\mathrm{rec}}^{(0)}\subseteq C_{\mathrm{rec}}.
+\]
+\end{proposition}
 
 \subsection{第二检测点的定位质量指标}
 
@@ -657,6 +681,10 @@ S_2^* = \arg\min_{X \in C_{\mathrm{good}}} \|X - S_1\|
 \end{equation}
 
 若存在空间对称解，优先选择与后续大范围搜索方向更吻合的一侧；若仍存在并列，则按照坐标字典序（先 $x$ 后 $y$）选取唯一确定解，确保决策算法的确定性与稳定度。该选择不把“交会角等于 $90^\circ$”写成硬约束。正交只用于生成有希望的候选点，最终仍由完整的 $J(X)$、可靠接收条件和移动代价决定。
+
+\begin{proposition}[第二检测点的词典序最优性]\label{prop:S2}
+设 $C_{\mathrm{good}}$ 为优良候选区域，则在坐标字典序规则下，式~\eqref{eq:S2_star} 所定义的第二检测点 $S_2^*$ 存在且唯一。
+\end{proposition}
 
 \subsection{第二检测点选择算法流程}
 
