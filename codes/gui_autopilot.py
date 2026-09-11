@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """模拟器 GUI 自动演练工具（UIA 方案，2026-09-11 用户解除演练自动化禁令后新建）。
 
 安全边界（硬编码，不可通过参数绕过）：
@@ -52,6 +53,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
 
 
 class AutopilotError(RuntimeError):
+    """自动演练护栏、界面附加或流程执行失败。"""
+
     pass
 
 
@@ -281,12 +284,24 @@ def wait_interface_ready(win, audit: Audit, timeout: float = 180.0) -> str:
 
 
 def build_run_command(problem: int) -> list[str]:
+    """读取演练命令并按参数令牌严格校验，拒绝题号或模式混淆。"""
     cmd_file = TESTER_DIR / f"runq{problem}.txt"
     line = cmd_file.read_text(encoding="utf-8").strip()
-    for required in ("--mode practice", "--confirm-practice"):
-        if required not in line:
-            raise AutopilotError(f"{cmd_file.name} 缺少 {required}，拒绝执行非演练命令")
     tokens = line.split()
+    mode_positions = [i for i, token in enumerate(tokens) if token == "--mode"]
+    problem_positions = [i for i, token in enumerate(tokens) if token == "--problem"]
+    if (len(mode_positions) != 1 or mode_positions[0] + 1 >= len(tokens)
+            or tokens[mode_positions[0] + 1] != "practice"):
+        raise AutopilotError(f"{cmd_file.name} 必须且只能指定一次 --mode practice")
+    if (len(problem_positions) != 1 or problem_positions[0] + 1 >= len(tokens)
+            or tokens[problem_positions[0] + 1] != str(problem)):
+        raise AutopilotError(f"{cmd_file.name} 的 --problem 必须严格等于 {problem}")
+    if tokens.count("--confirm-practice") != 1:
+        raise AutopilotError(f"{cmd_file.name} 必须且只能包含一次 --confirm-practice")
+    module_positions = [i for i, token in enumerate(tokens) if token == "-m"]
+    if (len(module_positions) != 1 or module_positions[0] + 1 >= len(tokens)
+            or tokens[module_positions[0] + 1] != "codes.run_robot"):
+        raise AutopilotError(f"{cmd_file.name} 必须且只能通过 -m codes.run_robot 执行")
     if tokens and tokens[0] in ("python", "python3", "py"):
         tokens[0] = sys.executable  # 替换而非追加，避免出现两个解释器前缀
     else:
