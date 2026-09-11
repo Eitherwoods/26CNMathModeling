@@ -14,10 +14,11 @@ from .config import (CHANNEL_COUNT, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
                      TARGET_RADIUS_M)
 from .offline_stub import OfflineStub, Source
 from .problem3_model import (ChannelKnowledge, Lattice, apply_direction,
-                             apply_near, apply_outside, apply_wedge,
+                             apply_distance_order, apply_near, apply_outside, apply_wedge,
                              coverage_radius_m, hex_waypoints,
                              sweep_waypoint_gain, wedge_distance)
-from .problem3_solution import Problem3Config, Problem3Strategy, run_mission, summarize
+from .problem3_solution import (Problem3Config, Problem3Strategy, StopPlan,
+                                run_mission, summarize)
 from .protocol import RobotClient, decode, encode
 from .scenario import fixed_scenario, random_scenario, sweep_waypoints
 from .strategy import run_strategy
@@ -272,6 +273,34 @@ class ChannelKnowledgeTests(unittest.TestCase):
         self.assertNotIn((18.0, 0.0), survivors(knowledge.mask))
         self.assertIn((1600.0, 0.0), survivors(knowledge.mask))
 
+    def test_distance_order_shrinks_after_signal_and_no_signal(self):
+        """共同未知接收半径应删除明显更靠近无信号点的候选。"""
+        lattice = probe_lattice()
+        mask = apply_distance_order(np.ones(len(PROBE), dtype=bool), lattice,
+                                    [(0.0, 0.0)], [(100.0, 0.0)])
+        self.assertIn((40.0, 0.0), survivors(mask))
+        self.assertNotIn((1000.0, 0.0), survivors(mask))
+
+    def test_distance_order_is_order_independent(self):
+        """先收信后无信号与先无信号后收信得到同一保守结果。"""
+        lattice = probe_lattice()
+        first = ChannelKnowledge(7, lattice, lattice)
+        second = ChannelKnowledge(7, lattice, lattice)
+        first.observe_direction(0.0, 0.0, 0.0)
+        first.observe_no_signal(100.0, 0.0)
+        second.observe_no_signal(100.0, 0.0)
+        second.observe_direction(0.0, 0.0, 0.0)
+        self.assertTrue(np.array_equal(first.mask, second.mask))
+        self.assertTrue(np.array_equal(first.plan_mask, second.plan_mask))
+
+    def test_distance_order_keeps_boundary_for_conservative_safety(self):
+        """边界及不确定性带内的点必须保留，不能因严格比较误删真值。"""
+        lattice = probe_lattice()
+        mask = apply_distance_order(np.ones(len(PROBE), dtype=bool), lattice,
+                                    [(0.0, 0.0)], [(40.0, 0.0)])
+        self.assertIn((20.0, 0.0), survivors(mask))
+        self.assertNotIn((40.0, 0.0), survivors(mask))
+
     def test_detected_channel_with_empty_mask_is_inconsistent(self):
         """已取得读数却算出空掩码属矛盾状态：不得当成"该频道不存在"。"""
         self.knowledge.observe_direction(0.0, 0.0, 0.0)
@@ -462,6 +491,71 @@ class StrategyGuardTests(unittest.TestCase):
         self.strategy.channels[3].observe_no_signal(1500.0, 0.0)
         self.strategy.channels[4].observe_near(0.0, 0.0)
         self.assertEqual(self.strategy._observed_channels(), [3, 4])
+
+
+class NewModelStrategyTests(unittest.TestCase):
+    """新建模落地：全局数量先验、保证性追踪及公平调度。"""
+
+    def setUp(self):
+        """构造不连接模拟器的最小问题三策略。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_unknown_probability_uses_global_count_bounds(self):
+        """未知频道存在概率应随已确认源数变化，而不是固定除以20。"""
+        probability, lower, upper = self.strategy._unknown_source_probability()
+        self.assertAlmostEqual(probability, 13.0 / 20.0, places=9)
+        self.assertEqual((lower, upper), (10, 16))
+        for channel in range(1, 11):
+            self.strategy.channels[channel].mark_cleared(0.0)
+        probability, lower, upper = self.strategy._unknown_source_probability()
+        self.assertAlmostEqual(probability, 3.0 / 10.0, places=9)
+        self.assertEqual((lower, upper), (0, 6))
+
+    def test_expected_finds_is_channel_specific(self):
+        """期望发现数只统计未发现频道，并按其当前可能区域计算命中比例。"""
+        waypoint = np.array([0.0, 0.0])
+        probability, _, _ = self.strategy._unknown_source_probability()
+        expected = self.strategy._expected_finds([1], waypoint)
+        ratio = (self.strategy._search_gain(1, waypoint)
+                 / self.strategy.channels[1].possible_area_m2)
+        self.assertAlmostEqual(expected, probability * ratio, places=9)
+        self.strategy._apply_measure(
+            1, waypoint,
+            {'measure_result': 'direction', 'svd_deg': 0.0, 'virtual_time_s': 5.0})
+        self.assertEqual(self.strategy._expected_finds([1], waypoint), 0.0)
+
+    def test_guaranteed_tracking_contracts_upper_bound(self):
+        """保证性追踪点必须按 qU 前进，并把下一轮安全上界收缩为 qU。"""
+        self.strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.0, 'virtual_time_s': 5.0})
+        plan = self.strategy._guaranteed_tracking_plan(
+            1, self.strategy.channels[1])
+        ratio = self.strategy._tracking_ratio()
+        self.assertEqual(plan.kind, 'guaranteed_track')
+        self.assertAlmostEqual(plan.waypoint[0], 1500.0 * ratio, places=6)
+        self.assertAlmostEqual(plan.waypoint[1], 0.0, places=6)
+        self.assertAlmostEqual(plan.guaranteed_upper_m, 1500.0 * ratio, places=6)
+
+    def test_tracking_upper_bound_can_certify_clear(self):
+        """追踪上界降到20米内时，当前锚点必须进入可靠清除候选。"""
+        self.strategy._apply_measure(
+            1, np.array([20.0, 10.0]),
+            {'measure_result': 'direction', 'svd_deg': 45.0, 'virtual_time_s': 5.0},
+            guaranteed_upper_m=15.0)
+        self.assertIn(1, self.strategy._clear_candidates((20.0, 10.0)))
+
+    def test_due_tracking_overrides_lower_scored_search(self):
+        """等待到期的保证性追踪必须越过一般评分，防止优化动作无限拖延。"""
+        self.strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.0, 'virtual_time_s': 5.0})
+        due = self.strategy._guaranteed_tracking_plan(1, self.strategy.channels[1])
+        cheap_search = StopPlan('sweep', np.array([0.0, 0.0]), [2], score_s=0.1)
+        self.strategy.tracking_wait_rounds[1] = self.strategy.config.tracking_debt_limit_rounds
+        self.strategy._chase_options = lambda: [due]
+        self.strategy._search_plan = lambda: cheap_search
+        self.assertEqual(self.strategy._decide().kind, 'guaranteed_track')
 
 
 class CoverageCertificateTests(unittest.TestCase):

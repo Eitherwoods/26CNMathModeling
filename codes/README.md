@@ -98,6 +98,8 @@ client.exit()
 4. 在模拟器选择“问题3演练测试”（验证问题4时选“问题4演练测试”）。
    **不要选择任何“正式测试”入口。** 等待数据准备和5秒倒计时，直到显示机器狗接口就绪。
 5. 核对当前确实是演练后，运行命令。程序发送 `/enter`，调用指定算法，再在正常返回后发送 `/exit`。
+   问题四的现成命令见 `tester/runq4.txt`，准备步骤与结束后要核对的三件事见
+   `solutions/problem4_flow.md` 的"官方模拟器演练"一节。
 6. 在软件“指令与反馈”中核对请求；结束后查看演练结果，同时保留本地JSONL日志。
    每次演练结束后接口关闭；下一次需在软件中重新启动演练，再运行一次命令。
 
@@ -172,7 +174,7 @@ python -m codes.run_robot --mode offline --problem 3 --strategy codes.strategy_p
 确认算法可用后，把上面的演练命令中的 `--strategy codes.strategy_demo:solve`
 替换成 `--strategy codes.strategy_p3:solve`；问题4同理使用对应文件和编号。
 问题三的 `codes/strategy_p3.py` 已实现（转发到 `problem3_solution`）；
-问题四入口为 `codes.strategy_p4:solve`（转发到 `problem4_solution`），已完成代码和测试脚手架，尚未运行测试。
+问题四入口为 `codes.strategy_p4:solve`（转发到 `problem4_solution`），已实现并通过离线自检。
 `--strategy`会导入并执行本地Python代码，只填写自己信任的模块。
 
 ## 问题三运行与自检
@@ -191,12 +193,55 @@ python -m codes.problem3_solution --seed 7 --sources 12 --figures
 **这些统计量不是官方演练成绩**，只用于验证"模型 + 策略 + 桩 + 绘图"链路可用。
 按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
 
-## 问题四代码与待执行测试
+## 问题四代码与离线自检
 
-建模审查见 `solutions/REVIEW-Q4-2026-09-11.md`，实现、近似边界与运行说明见
-`solutions/problem4_flow.md`。联合模型为 `problem4_model.py`，五项决策为
-`problem4_solution.py`；`scenario_p4.py` 提供混合源案例，`test_problem4.py`
-提供后续单元和离线回归入口。问题四本轮仅做文本审查，未运行测试、编译或模拟器会话。
+建模审查见 `solutions/REVIEW-Q4-2026-09-11.md`，实现、近似边界与运行结果见
+`solutions/problem4_flow.md`。文件职责：
+
+| 文件 | 用途 |
+| --- | --- |
+| `problem4_model.py` | 联合位置单元×类型×接收半径×朝向的保守外包、三角搜索网格。 |
+| `problem4_solution.py` | 五项决策策略、离线自检入口与记录汇总入口。 |
+| `problem4_plotting.py` | 任务四联图（轨迹与朝向、覆盖证据、可能位置收敛、时间构成）。 |
+| `scenario_p4.py` | 混合朝向与边界朝外案例工厂；真值仅供测试端使用。 |
+| `test_problem4.py` | 49 项单元、入口、绘图、记录落盘与离线端到端测试。 |
+
+问题四同样不依赖官方模拟器即可自检。默认案例是一半定向、一半全向的12源混合案例：
+
+```powershell
+python -m unittest codes.test_problem4 -v                 # 49 项（默认跳过 5 项端到端）
+$env:RUN_PROBLEM4_E2E = '1'                               # 需要端到端时显式开启
+python -m unittest codes.test_problem4 -v
+Remove-Item Env:\RUN_PROBLEM4_E2E
+python -m codes.problem4_solution --sources 12 --seed 1 --figures
+python -m codes.problem4_solution --sources 12 --seed 1 --directional 0    # 全向案例
+```
+
+任务记录按 `output/README.md` 的约定二分：**离线自检进 `output/protocol/`**（文件名带
+`offline-` 前缀），**在线演练/正式测试进 `output/Problem4/`**；任务图一律进
+`figures/Problem4/`。离线统计量**不是官方演练成绩**。目录清单见 `output/protocol/README.md`；
+落盘目录由 `config.record_dir_for()` 决定，`problem4_solution.solve()` 按"是否跑在
+`OfflineStub` 上"自动选择，不需要人工搬。已有记录也可单独汇总真实总数（演练结束后才能知道）：
+
+```powershell
+python -m codes.problem4_solution "output/protocol/offline-mission_p4_时间戳.json" --true-total 12
+```
+
+**动作数远高于问题三，但不构成真实时间风险**：排除证据要求每个频道在全部 37 个搜索
+顶点各做一次无信号检测，因此案例动作数约 640～740（问题三约 250～300）。按上局问题三
+真实演练日志实测的单动作墙钟（1343 动作 / 157.4 s ≈ **117 ms/动作**，其中主要是本地
+规划计算），问题四一局约 **75～90 s**，20 分钟真实窗与虚拟预算都远未触及；策略在预算
+不足时仍会安全收尾并标记 `budget_limit`，不会谎报完成。
+
+演练时真正要盯的是：排除证据必须走到半径最大约 2700 m 的网格顶点（1800 m 圆域之外，
+为了让边界朝外的定向源也能被正面看到）。**这一点已被 14:15 首局真实演练确认接受**——最远
+2700 m 的 187 个区域外动作全部 accepted，方案不必再改。演练命令见 `tester/runq4.txt` 与
+`solutions/problem4_flow.md`；图怎么读见 `figures/Problem4/README.md`。演练后可从记录直接重画
+（在线记录在 `output/Problem4/`，离线记录在 `output/protocol/`，两者命令相同）：
+
+```powershell
+python -m codes.problem4_plotting "output/Problem4/mission_p4_时间戳.json" --name practice_p4_L2
+```
 
 ## 连接约束
 

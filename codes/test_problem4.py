@@ -1,23 +1,40 @@
 # -*- coding: utf-8 -*-
-"""问题四待执行测试脚手架：几何、联合外包、动作与完成证据。
+"""问题四测试：几何证书、联合外包、动作与完成证据、入口与绘图。
 
-本文件创建时未运行。普通unittest只用内存上下文/本地桩；较长端到端用例
-需显式设置RUN_PROBLEM4_E2E=1。任何用例都不会连接官方模拟器。
+普通unittest只用内存上下文或本地桩；较长端到端用例需显式设置RUN_PROBLEM4_E2E=1。
+任何用例都不会连接官方模拟器。
 """
+import contextlib
+import io
+import json
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 
+from . import config as settings
+from .config import (MIN_RECEIVE_RADIUS_M, PROBLEM4_OUTPUT_DIR, PROTOCOL_LOG_DIR,
+                     TARGET_RADIUS_M, record_dir_for)
 from .offline_stub import OfflineStub, Source
 from .problem3_model import Lattice
 from .problem4_model import Problem4Knowledge, triangular_search_waypoints
-from .problem4_solution import Problem4Config, Problem4Strategy, feedback_score, run_mission
-from .protocol import RobotClient
+from .problem4_solution import (Problem4Config, Problem4Strategy, build_scenario,
+                                feedback_score, is_offline_run, main, run_mission,
+                                solve, summarize)
+from .protocol import HttpTransport, RobotClient
 from .scenario import fixed_scenario
 from .scenario_p4 import boundary_scenario, mixed_scenario
-from .strategy import BudgetReached, run_strategy
+from .strategy import BudgetReached, StrategyContext, run_strategy
+
+try:
+    import matplotlib  # noqa: F401
+    HAVE_MATPLOTLIB = True
+except Exception:  # pragma: no cover - 取决于本机环境
+    HAVE_MATPLOTLIB = False
 
 
 class MemoryContext:
@@ -191,6 +208,12 @@ class StrategyEvidenceTests(unittest.TestCase):
         with self.assertRaises(BudgetReached):
             self.strategy._check_action_budget(np.array([100, 0]), 'measure', 1)
 
+    def test_fairness_age_must_be_a_positive_integer(self):
+        """公平年龄为零或负数时调度规则失去意义，必须在发令前被拒绝。"""
+        for bad in (0, -3, True):
+            with self.assertRaises(ValueError):
+                Problem4Config(fairness_age_rounds=bad)
+
 
 class LocalProtocolTests(unittest.TestCase):
     """使用现有内存协议桩检查题面边界，不连接网络。"""
@@ -208,7 +231,323 @@ class LocalProtocolTests(unittest.TestCase):
         client.exit()
 
 
-@unittest.skipUnless(os.environ.get('RUN_PROBLEM4_E2E') == '1', '完整离线回归须显式启用；当前尚未执行。')
+class JointModelGuardTests(unittest.TestCase):
+    """联合外包围的保守性：未知频道不得被凭空排除，已清除频道不得继续读。"
+
+    与实际问题四相同的20米格距，用于确认整域规模下的判据与字段行为。
+    """
+
+    def setUp(self):
+        """使用默认格距的整域格网，暴露全格点乘联合数组时的字段行为。"""
+        self.lattice = Lattice.build(20.0)
+        self.knowledge = Problem4Knowledge(3, self.lattice)
+
+    def test_no_signal_on_unknown_channel_keeps_full_uncertainty(self):
+        """未知频道的无信号既不改状态，也不当作圆外排除证据。"""
+        self.knowledge.observe('no_signal', -100, 0)
+        self.assertEqual(self.knowledge.status, 'unknown')
+        self.assertEqual(self.knowledge.type_status, 'unknown')
+        self.assertEqual(len(self.knowledge.possible_points()), len(self.lattice.points))
+
+    def test_observe_is_rejected_after_cleared(self):
+        """清除成功后不能再登记检测，避免在已释放的联合数组上更新。"""
+        self.knowledge.observe('near', 1, 0)
+        self.knowledge.mark_cleared()
+        with self.assertRaises(ValueError):
+            self.knowledge.observe('direction', 0, 0, bearing_deg=10)
+
+    def test_fallback_point_is_a_surviving_cell(self):
+        """后备清除点必须是存活单元，且不能再被提前删除。"""
+        self.knowledge.observe('direction', 100, 0, bearing_deg=180)
+        point = self.knowledge.fallback_point(np.array([0.0, 5.0]))
+        self.assertIsNotNone(point)
+        self.assertTrue(np.any(np.all(self.knowledge.possible_points() == point, axis=1)))
+
+    def test_planned_hypotheses_stay_inside_declared_bins(self):
+        """启发式样本必须落在声明的半径与朝向区间内，且数量受限。"""
+        self.knowledge.observe('direction', 100, 0, bearing_deg=180)
+        rows = self.knowledge.planning_hypotheses(8)
+        self.assertLessEqual(len(rows), 8)
+        self.assertEqual(rows.shape[1], 5)
+        self.assertTrue(np.all(rows[:, 2] >= 0))
+        self.assertTrue(np.all((rows[:, 4] >= 0) & (rows[:, 4] < 360)))
+
+    def test_reliable_clear_requires_distance_bound_over_all_cells(self):
+        """可靠清除要覆盖全部存活单元，而不是只看最近的格点。"""
+        self.knowledge.observe('direction', 100, 0, bearing_deg=180)
+        cell = self.knowledge.fallback_point(np.array([0.0, 0.0]))
+        self.assertFalse(self.knowledge.certain_clear(float(cell[0]), float(cell[1])))
+
+
+class ChannelSelectionTests(unittest.TestCase):
+    """调度必须服务虚拟时间（移动占九成），同时保证没有频道被饿死。"""
+
+    TRAVEL = {3: 900.0, 7: 100.0, 11: 400.0}
+
+    def setUp(self):
+        """构造只测试选择规则的策略；不执行任何动作。"""
+        self.strategy = Problem4Strategy(MemoryContext())
+        self.strategy._channel_travel_m = lambda channel: self.TRAVEL[channel]
+
+    def test_prefers_the_channel_with_the_nearest_next_target(self):
+        """未超龄时选下一个追踪点最近的频道，以压低行进（虚拟时间第一成本项）。"""
+        self.strategy.round = 5
+        self.strategy.last_served.update({3: 4, 7: 4, 11: 4})
+        self.assertEqual(self.strategy._next_channel([3, 7, 11]), 7)
+
+    def test_aged_channel_is_forced_ahead_of_nearer_ones(self):
+        """等待超过公平年龄的频道必须被强制优先，避免被"最近优先"永久饿死。"""
+        self.strategy.round = 5 + self.strategy.config.fairness_age_rounds
+        self.strategy.last_served.update({3: 5, 7: 20, 11: 9})
+        self.assertEqual(self.strategy._next_channel([3, 7, 11]), 3)
+
+    def test_oldest_of_the_aged_channels_wins(self):
+        """多个超龄频道时服务等待最久的那个，保证等待时间有上界。"""
+        self.strategy.round = 400
+        self.strategy.last_served.update({3: 40, 7: 30, 11: 20})
+        self.assertEqual(self.strategy._next_channel([3, 7, 11]), 11)
+
+    def test_selection_only_orders_channels(self):
+        """选择规则只排序，不改位置与状态；用于确认它不引入额外几何假设。"""
+        self.strategy.round = 5
+        self.strategy.last_served.update({3: 4, 7: 4, 11: 4})
+        before = self.strategy.position.copy()
+        self.strategy._next_channel([3, 7, 11])
+        np.testing.assert_array_equal(before, self.strategy.position)
+
+
+class SearchCertificateTests(unittest.TestCase):
+    """三角网格必须同时给出"任意朝向可发现"与"满覆盖可排除"两项保证。"""
+
+    def setUp(self):
+        """预生成搜索顶点与区域内采样网格，供两项证书共用。"""
+        self.points = triangular_search_waypoints(900.0)
+        step = 300.0
+        axis = np.arange(-TARGET_RADIUS_M, TARGET_RADIUS_M + step, step)
+        self.samples = np.array([(x, y) for x in axis for y in axis
+                                 if np.hypot(x, y) <= TARGET_RADIUS_M + 1e-9])
+
+    def test_covering_radius_keeps_margin_below_min_receive_radius(self):
+        """区域上每个目标到最近顶点的距离必须小于最小有效接收半径。"""
+        worst = 0.0
+        for query in self.samples:
+            worst = max(worst, float(np.linalg.norm(self.points - query, axis=1).min()))
+        self.assertLessEqual(worst, 900.0 + 1e-6)
+        self.assertLess(worst, MIN_RECEIVE_RADIUS_M - 90.0)
+
+    def test_every_position_and_orientation_can_be_seen(self):
+        """目标位于若干1000米内顶点的凸包内，则任一朝向必被至少一个顶点正面看到。
+
+        若方向集合的环形最大空隙不超过180度，0必在其凸包中，等价于不存在
+        使全部顶点落在背面的朝向。定向源的"两侧各90度"由此得到任意朝向保证。
+        """
+        for query in self.samples:
+            nearby = self.points[np.linalg.norm(self.points - query, axis=1)
+                                 <= MIN_RECEIVE_RADIUS_M + 1e-9]
+            self.assertGreater(len(nearby), 0)
+            offset = nearby - query
+            nonzero = np.linalg.norm(offset, axis=1) > 1e-9
+            if not nonzero.any():
+                continue  # 目标恰落在顶点上：零距离对任意朝向都算正面
+            angles = np.sort(np.arctan2(offset[nonzero, 1], offset[nonzero, 0]))
+            gaps = np.diff(np.concatenate((angles, [angles[0] + 2 * np.pi])))
+            self.assertLessEqual(float(gaps.max()), np.pi + 1e-9)
+
+    def test_waypoint_count_documents_sweep_cost(self):
+        """顶点个数是排除证据的动作数下限（每频道需遍历全部顶点）。
+
+        该数字只由格距与目标半径决定；调整参数必须同时复核上面的覆盖证书。
+        """
+        self.assertEqual(len(self.points), 37)
+        radii = np.linalg.norm(self.points, axis=1)
+        self.assertLessEqual(float(radii.max()), TARGET_RADIUS_M + 900.0 + 1e-6)
+        self.assertGreater(float(radii.max()), TARGET_RADIUS_M)
+
+
+class ResultAndSummaryTests(unittest.TestCase):
+    """结果字段必须能与问题三同一口径判读，异常与未证明不得混同。"""
+
+    def setUp(self):
+        """初始化不允许动作的上下文与策略。"""
+        self.strategy = Problem4Strategy(MemoryContext())
+
+    def test_result_exposes_evidence_and_anomaly_fields(self):
+        """未开始时全部频道未证明，且不出现模型异常。"""
+        result = self.strategy.result()
+        self.assertFalse(result['completed'])
+        self.assertEqual(result['unresolved_channels'], list(range(1, 21)))
+        self.assertEqual(result['inconsistent_channels'], [])
+        self.assertEqual(result['search_waypoints'], len(self.strategy.waypoints))
+        self.assertEqual(sorted(result['channel_series']), list(range(1, 21)))
+        self.assertEqual(result['cleared_channels'], [])
+
+    def test_unresolved_and_inconsistent_are_reported_separately(self):
+        """异常频道既不算已清除，也不再算未证明。"""
+        self.strategy.channels[1].mark_cleared()
+        self.strategy.channels[2].status = 'inconsistent'
+        result = self.strategy.result()
+        self.assertEqual(result['cleared_channels'], [1])
+        self.assertEqual(result['inconsistent_channels'], [2])
+        self.assertEqual(result['unresolved_channels'], list(range(3, 21)))
+        self.assertEqual(result['planner_errors'], 0)
+
+    def test_summary_keeps_unresolved_under_cleared_limit(self):
+        """清满上界收工时，未证明频道应保留在汇总里而不是被当作不存在。"""
+        for channel in range(1, 17):
+            self.strategy.channels[channel].mark_cleared()
+        self.assertEqual(self.strategy.finished(), 'cleared_limit')
+        self.strategy.stop_reason = 'cleared_limit'
+        summary = summarize(self.strategy.result(), true_total=16)
+        self.assertTrue(summary['completed'])
+        self.assertEqual(summary['cleared_count'], 16)
+        self.assertEqual(summary['cleared_ratio'], 1.0)
+        self.assertEqual(summary['unresolved_channels'], list(range(17, 21)))
+
+    def test_summary_rejects_impossible_true_total(self):
+        """真实总数不能小于已清除数，也不能超过频道上限。"""
+        self.strategy.channels[1].mark_cleared()
+        record = self.strategy.result()
+        for bad in (0, -1, 25):
+            with self.assertRaises(ValueError):
+                summarize(record, true_total=bad)
+        summary = summarize(record, true_total=8)
+        self.assertEqual(summary['cleared_ratio'], 0.125)
+
+    def test_model_inconsistent_is_not_completion(self):
+        """空联合外包必须以异常收尾，不得当成频道不存在。"""
+        lattice = Lattice(np.array([[0.0, 0.0]]), 1.0, 1.0, 0.0)
+        strategy = Problem4Strategy(MemoryContext())
+        strategy.channels[4] = Problem4Knowledge(4, lattice)
+        strategy.channels[4].observe('near', 0, 0)
+        strategy.channels[4].observe('near', 100, 100)
+        self.assertEqual(strategy.finished(), 'model_inconsistent')
+        strategy.stop_reason = 'model_inconsistent'
+        self.assertFalse(strategy.result()['completed'])
+        self.assertEqual(strategy.result()['planner_errors'], 1)
+
+
+class OfflineEntryTests(unittest.TestCase):
+    """命令行入口：不带记录文件时在本地桩上自检，带记录文件时只做汇总。"""
+
+    def test_build_scenario_mixes_requested_share(self):
+        """定向源比例可按参数调整，源数不足时退化为全向案例。"""
+        self.assertTrue(all(s.direction_deg is None for s in build_scenario(12, 1, 0).sources))
+        share = build_scenario(12, 1, None)
+        self.assertEqual(len(share.sources), 12)
+        self.assertEqual(sum(s.direction_deg is not None for s in share.sources), 6)
+        clamped = build_scenario(12, 1, 99)
+        self.assertEqual(sum(s.direction_deg is not None for s in clamped.sources), 11)
+        self.assertTrue(all(s.direction_deg is None for s in build_scenario(1, 1, None).sources))
+
+    def test_record_mode_only_summarises(self):
+        """给出记录文件时不应发起任何请求，只打印统计量。"""
+        record = {'cleared_channels': [3], 'start_virtual_time_s': 0.0,
+                  'end_virtual_time_s': 120.0, 'real_elapsed_s': 1.5,
+                  'stop_reason': 'budget_limit', 'moved_distance_m': 500.0,
+                  'planner_errors': 0, 'completed': False,
+                  'steps': [{'kind': 'measure', 'result': 'no_signal'}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'record.json'
+            path.write_text(json.dumps({'record': record}), encoding='utf-8')
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                self.assertIsNone(main([str(path), '--true-total', '2']))
+        payload = json.loads(buffer.getvalue())
+        self.assertEqual(payload['cleared_count'], 1)
+        self.assertEqual(payload['true_total'], 2)
+        self.assertEqual(payload['cleared_ratio'], 0.5)
+        self.assertEqual(payload['no_signal_count'], 1)
+        self.assertFalse(payload['completed'])
+
+    def test_record_mode_rejects_impossible_total(self):
+        """汇总入口同样拒绝不可能的真实总数。"""
+        record = {'cleared_channels': [1, 2], 'start_virtual_time_s': 0.0,
+                  'end_virtual_time_s': 10.0, 'real_elapsed_s': 0.1,
+                  'stop_reason': 'budget_limit', 'moved_distance_m': 0.0,
+                  'planner_errors': 0, 'completed': False, 'steps': []}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'record.json'
+            path.write_text(json.dumps(record), encoding='utf-8')
+            with self.assertRaises(ValueError):
+                main([str(path), '--true-total', '1'])
+
+
+class RecordPlacementTests(unittest.TestCase):
+    """记录落盘目录：离线自检归 output/protocol，在线演练/正式归 output/ProblemN。"""
+
+    def test_record_dir_follows_the_online_offline_split(self):
+        """分工由 config.record_dir_for 统一给出：离线永远进 protocol，未知题号直接拒绝。"""
+        self.assertEqual(record_dir_for(4, offline=True), PROTOCOL_LOG_DIR)
+        self.assertEqual(record_dir_for(4, offline=False), PROBLEM4_OUTPUT_DIR)
+        self.assertEqual(record_dir_for(3, offline=False).name, 'Problem3')
+        with self.assertRaises(ValueError):
+            record_dir_for(9, offline=False)
+        with self.assertRaises(ValueError):
+            record_dir_for('四', offline=False)
+
+    def test_only_the_stub_transport_counts_as_offline(self):
+        """在线传输必须被判成在线，否则演练成绩会被写进离线目录。"""
+        online = StrategyContext(RobotClient('team-x',
+                                             HttpTransport('http://127.0.0.1:2026',
+                                                           allow_network=True)), 4)
+        self.assertFalse(is_offline_run(online))
+        self.assertFalse(is_offline_run(SimpleNamespace(client=RobotClient('team-x'))))
+        stub = OfflineStub()
+        self.assertTrue(is_offline_run(StrategyContext(RobotClient('offline-team', stub), 4)))
+
+    def test_offline_run_writes_its_record_under_protocol(self):
+        """离线跑一局：记录必须落在 protocol 且带 offline- 前缀，不污染 output/Problem4。"""
+        scenario = fixed_scenario([(1, 300.0, 400.0), (2, -900.0, 800.0)])
+        client = RobotClient('offline-team', OfflineStub(sources=scenario.sources))
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(settings, 'PROTOCOL_LOG_DIR', Path(tmp)):
+                summary = run_strategy(client, solve, problem=4)['algorithm_result']
+            target = Path(summary['record_path'])
+            self.assertEqual(target.parent, Path(tmp))
+            self.assertTrue(target.name.startswith('offline-mission_p4_'), target.name)
+            self.assertTrue(target.exists())
+            payload = json.loads(target.read_text(encoding='utf-8'))
+            self.assertEqual(payload['summary']['cleared_count'], 2)
+            self.assertEqual(payload['record']['problem'], 4)
+
+
+@unittest.skipUnless(HAVE_MATPLOTLIB, '绘制任务图需要 matplotlib。')
+class PlottingTests(unittest.TestCase):
+    """任务图使用Agg后端写盘，不弹窗、不联网。"""
+
+    def test_mission_figure_writes_png_and_svg(self):
+        """一次小案例的完整记录应能画出四联图。"""
+        from .problem4_plotting import plot_mission
+        scenario = fixed_scenario([(1, 300.0, 400.0), (2, -900.0, 800.0)])
+        client = RobotClient('offline-team', OfflineStub(sources=scenario.sources))
+        record = run_strategy(client, run_mission, problem=4)['algorithm_result']
+        with tempfile.TemporaryDirectory() as tmp:
+            target = plot_mission(record, scenario=scenario, figures_dir=tmp, name='mission_test')
+            self.assertTrue(target.exists())
+            self.assertGreater(target.stat().st_size, 1000)
+            self.assertTrue((Path(tmp) / 'mission_test.svg').exists())
+
+    def test_plot_from_path_needs_a_record(self):
+        """没有记录路径时不绘图，也不报错。"""
+        from .problem4_plotting import plot_mission_from_path
+        self.assertIsNone(plot_mission_from_path(None))
+
+    def test_cli_draws_from_an_existing_record(self):
+        """从记录文件出图：演练记录没有真值，也应能画出轨迹与证据三幅。"""
+        from .problem4_plotting import main as plot_main
+        scenario = fixed_scenario([(1, 300.0, 400.0), (2, -900.0, 800.0)])
+        client = RobotClient('offline-team', OfflineStub(sources=scenario.sources))
+        record = run_strategy(client, run_mission, problem=4)['algorithm_result']
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'record.json'
+            path.write_text(json.dumps({'record': record}), encoding='utf-8')
+            target = plot_main([str(path), '--figures-dir', tmp, '--name', 'cli_test'])
+            self.assertTrue(Path(target).exists())
+            self.assertEqual(Path(target).name, 'cli_test.png')
+            self.assertTrue((Path(tmp) / 'cli_test.svg').exists())
+
+
+@unittest.skipUnless(os.environ.get('RUN_PROBLEM4_E2E') == '1', '完整离线回归须显式启用（默认跳过以缩短常规自检）。')
 class EndToEndTests(unittest.TestCase):
     """完整流程回归与边界/混合案例；不生成任何官方成绩。"""
 
@@ -219,6 +558,7 @@ class EndToEndTests(unittest.TestCase):
         result = run_strategy(client, run_mission, problem=4)['algorithm_result']
         self.assertTrue(result['completed'], result['stop_reason'])
         self.assertEqual(set(result['cleared_channels']), set(scenario.channels()))
+        return result
 
     def test_mixed(self):
         """12源混合案例完整清除回归。"""
@@ -231,6 +571,29 @@ class EndToEndTests(unittest.TestCase):
     def test_omnidirectional_regression(self):
         """问题四策略仍应能够处理纯全向的小型基线。"""
         self._run_case(fixed_scenario([(1, 300, 400), (2, -900, 800)]))
+
+    def test_exclusion_certificate_matches_hidden_truth(self):
+        """被判"不存在"的频道与真实源集合必须交集为空，既不能漏判也不能误判。"""
+        from .scenario import random_scenario
+        scenario = random_scenario(seed=1, n_sources=10)
+        result = self._run_case(scenario)
+        excluded = {channel for channel, status in result['channels'].items()
+                    if status['status'] == 'excluded'}
+        self.assertEqual(excluded & set(scenario.channels()), set())
+        self.assertEqual(len(excluded), 10)
+        for channel in excluded:
+            self.assertEqual(result['channels'][channel]['coverage_done'],
+                             result['channels'][channel]['coverage_required'])
+        self.assertEqual(result['stop_reason'], 'all_channels_resolved')
+
+    def test_exhausted_budget_is_not_completion(self):
+        """真实预算耗尽时必须安全收尾，且不得声称完成或发新动作。"""
+        scenario = fixed_scenario([(1, 300, 400), (2, -900, 800)])
+        client = RobotClient('offline-team', OfflineStub(sources=scenario.sources, remaining=5))
+        result = run_strategy(client, run_mission, problem=4)['algorithm_result']
+        self.assertFalse(result['completed'])
+        self.assertEqual(result['stop_reason'], 'budget_limit')
+        self.assertEqual(result['steps'], [])
 
 
 if __name__ == '__main__':

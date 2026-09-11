@@ -124,6 +124,26 @@ def apply_outside(mask, lattice, x, y, radius_m):
     return mask & (lattice.distances_to(x, y) >= radius_m - lattice.covering_radius_m)
 
 
+def apply_distance_order(mask, lattice, signal_points, no_signal_points):
+    """按未知共同接收半径施加保守的距离次序约束。
+
+    若 S 为任一有效收信点、N 为任一无信号点，则共同未知半径 r 给出
+    ``|G-S| < |G-N|``。格点代表半径为 covering_radius_m 的小单元；只有
+    当 ``|q-S|-r_h >= |q-N|+r_h`` 时，q 的整个代表单元都违反该次序，
+    才删除 q，从而避免严格不等式和浮点误差误删真实位置。
+    """
+    if not signal_points or not no_signal_points:
+        return mask
+    covering = float(lattice.covering_radius_m)
+    keep = np.ones(len(lattice.points), dtype=bool)
+    for sx, sy in signal_points:
+        signal_distance = np.linalg.norm(lattice.points - np.array([sx, sy]), axis=1)
+        for nx, ny in no_signal_points:
+            no_signal_distance = np.linalg.norm(lattice.points - np.array([nx, ny]), axis=1)
+            keep &= (signal_distance - covering < no_signal_distance + covering)
+    return mask & keep
+
+
 def coverage_radius_m(points, waypoints):
     """点集到最近停靠点的最大距离，用于检验扫描布站的覆盖完备性。"""
     points = np.asarray(points, dtype=float)
@@ -191,18 +211,21 @@ class ChannelKnowledge:
         self.mask = apply_direction(self.mask, self.fine, x, y, bearing_deg)
         self.plan_mask = apply_direction(self.plan_mask, self.coarse, x, y, bearing_deg)
         self._record(x, y, 'direction', bearing_deg, virtual_time_s)
+        self._apply_distance_order()
 
     def observe_near(self, x, y, virtual_time_s=0.0):
         """距离过近：位置集合收缩到五米圆域。"""
         self.mask = apply_near(self.mask, self.fine, x, y)
         self.plan_mask = apply_near(self.plan_mask, self.coarse, x, y)
         self._record(x, y, 'near', None, virtual_time_s)
+        self._apply_distance_order()
 
     def observe_no_signal(self, x, y, virtual_time_s=0.0):
         """无信号：排除最小有效接收半径圆域内的位置。"""
         self.mask = apply_outside(self.mask, self.fine, x, y, MIN_RECEIVE_RADIUS_M)
         self.plan_mask = apply_outside(self.plan_mask, self.coarse, x, y, MIN_RECEIVE_RADIUS_M)
         self._record(x, y, 'no_signal', None, virtual_time_s)
+        self._apply_distance_order()
 
     def observe_clear_failure(self, x, y, virtual_time_s=0.0):
         """清除失败：目标不在清除半径内，排除该圆域。"""
@@ -227,6 +250,17 @@ class ChannelKnowledge:
         if result != 'no_signal' and self.status == 'unknown':
             self.status = 'detected'
             self.detected_virtual_s = float(virtual_time_s)
+
+    def _apply_distance_order(self):
+        """用全部历史收信/无信号点同步收紧两套可能位置掩码。"""
+        signal_points = [(obs.x, obs.y) for obs in self.observations
+                         if obs.result in ('direction', 'near')]
+        no_signal_points = [(obs.x, obs.y) for obs in self.observations
+                            if obs.result == 'no_signal']
+        self.mask = apply_distance_order(self.mask, self.fine,
+                                         signal_points, no_signal_points)
+        self.plan_mask = apply_distance_order(self.plan_mask, self.coarse,
+                                              signal_points, no_signal_points)
 
     # ------------------------------------------------------------------ 查询
 
