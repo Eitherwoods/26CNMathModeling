@@ -9,8 +9,9 @@ import unittest
 import numpy as np
 
 from .base_models import distance_to_wedge, min_enclosing_circle, sampled_diameter
-from .config import (CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M, MIN_RECEIVE_RADIUS_M,
-                     NEAR_DISTANCE_M, TARGET_RADIUS_M)
+from .config import (CHANNEL_COUNT, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
+                     MIN_RECEIVE_RADIUS_M, NEAR_DISTANCE_M, ROBOT_SPEED_MPS,
+                     TARGET_RADIUS_M)
 from .offline_stub import OfflineStub, Source
 from .problem3_model import (ChannelKnowledge, Lattice, apply_direction,
                              apply_near, apply_outside, apply_wedge,
@@ -461,6 +462,153 @@ class StrategyGuardTests(unittest.TestCase):
         self.strategy.channels[3].observe_no_signal(1500.0, 0.0)
         self.strategy.channels[4].observe_near(0.0, 0.0)
         self.assertEqual(self.strategy._observed_channels(), [3, 4])
+
+
+class CoverageCertificateTests(unittest.TestCase):
+    """不存在性证明的覆盖证书：必须能区分"真覆盖"与"只是掩码空了"。"""
+
+    def setUp(self):
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_candidate_grid_is_coverage_complete(self):
+        """固定候选格网（域内 9 点）必须对任意源位置都能给出读数。
+
+        最坏距离必须不超过有效接收半径下界 1000 m，这是"九点全无信号 ⇒
+        该频道不存在"这条严格结论的依据。
+        """
+        complete, worst, note = self.strategy.verify_coverage_completeness()
+        self.assertTrue(complete, f'候选格网不具备覆盖完备性：{note}')
+        self.assertLessEqual(worst, MIN_RECEIVE_RADIUS_M)
+        self.assertGreater(worst, 700.0, '最坏距离过小，采样可能失真')
+
+    def test_candidates_exclude_out_of_region_points(self):
+        """候选集必须剔除落在目标圆域外的格点（曾混入 4 个半径 2400 的点）。"""
+        radii = np.hypot(self.strategy.candidates[:, 0], self.strategy.candidates[:, 1])
+        self.assertLessEqual(radii.max(), TARGET_RADIUS_M + 1e-9)
+        self.assertEqual(len(self.strategy.candidates), 9)
+
+    def test_certificate_rejects_insufficient_coverage(self):
+        """只测一个点就判"不存在"时，证书必须拒绝认证。"""
+        probe = self.strategy.channels[6]
+        probe.observe_no_signal(0.0, 0.0)
+        certificate = self.strategy._exclusion_certificate(6)
+        self.assertFalse(certificate['certified'])
+        self.assertEqual(certificate['no_signal_stations'], 1)
+
+    def test_certificate_accepts_full_coverage(self):
+        """九点全测后掩码为空，证书必须给出认证，且覆盖半径不超过 1000 m。"""
+        probe = self.strategy.channels[6]
+        for x, y in self.strategy.candidates:
+            probe.observe_no_signal(x, y)
+        self.assertTrue(probe.is_excluded)
+        certificate = self.strategy._exclusion_certificate(6)
+        self.assertTrue(certificate['certified'])
+        self.assertEqual(certificate['no_signal_stations'], 9)
+        self.assertLessEqual(certificate['covering_radius_m'], MIN_RECEIVE_RADIUS_M)
+
+    def test_certificates_skip_cleared_channels(self):
+        """已清除频道不属于"不存在"结论，不得出现在覆盖证书里。"""
+        self.strategy.channels[6].mark_cleared(0.0)
+        self.assertNotIn(6, self.strategy._exclusion_certificates())
+
+    def test_finished_requires_certified_exclusions(self):
+        """掩码全空但无覆盖证据时不得收工，避免假阳性的 all_channels_resolved。"""
+        # 所有频道都只拿到一条中心处的无信号读数：掩码非空 → 本来就不可收工。
+        # 这里把掩码强行清空来模拟"覆盖不足却掩码空了"的病态状态。
+        for channel in range(1, CHANNEL_COUNT + 1):
+            probe = self.strategy.channels[channel]
+            probe.observe_no_signal(0.0, 0.0)
+            probe.mask[:] = False
+            probe.plan_mask[:] = False
+            probe.status = 'unknown'
+        certificate = self.strategy._exclusion_certificate(6)
+        self.assertFalse(certificate['certified'])
+        self.assertNotEqual(self.strategy._finished(), 'all_channels_resolved')
+
+    def test_finished_accepts_certified_exclusions(self):
+        """全部频道要么已清除、要么有覆盖证据时，才允许收工。"""
+        for channel in range(1, CHANNEL_COUNT + 1):
+            probe = self.strategy.channels[channel]
+            for x, y in self.strategy.candidates:
+                probe.observe_no_signal(x, y)
+        self.assertEqual(self.strategy._finished(), 'all_channels_resolved')
+
+
+class FollowUpEstimateTests(unittest.TestCase):
+    """后续清除代价的口径：必须随停靠点变化，不能是全域常数。"""
+
+    def setUp(self):
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_follow_up_varies_with_waypoint(self):
+        """不同停靠点的后续代价必须不同（回归：曾对任何点都返回同一常数）。"""
+        near = self.strategy._follow_up_seconds((0.0, 0.0))
+        far = self.strategy._follow_up_seconds((1500.0, 0.0))
+        self.assertGreater(near, 0.0)
+        self.assertNotAlmostEqual(near, far, places=3)
+
+    def test_follow_up_uses_reachable_region_only(self):
+        """后续代价只对该停靠点能覆盖到的区域取平均，量级应在数百米以内。"""
+        near = self.strategy._follow_up_seconds((0.0, 0.0))
+        # 中心点的接收圆半径 1000 m，平均距离约 2/3*1000 ≈ 667 m ⇒ 约 133 s。
+        self.assertLess(near, MIN_RECEIVE_RADIUS_M / ROBOT_SPEED_MPS)
+        self.assertGreater(near, 50.0)
+
+
+class BackstopSearchTests(unittest.TestCase):
+    """覆盖兜底：只在确有连通空洞时触发，且不得为整片残余横穿全场。"""
+
+    def setUp(self):
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_no_backstop_when_nothing_pending(self):
+        """所有频道都已清除或已排除时，兜底不得给出任何动作。"""
+        for channel in range(1, CHANNEL_COUNT + 1):
+            probe = self.strategy.channels[channel]
+            for x, y in self.strategy.candidates:
+                probe.observe_no_signal(x, y)
+        self.assertTrue(all(not knowledge.is_active
+                            for knowledge in self.strategy.channels.values()))
+        self.assertIsNone(self.strategy._backstop_search_plan(5))
+
+    def test_no_backstop_below_area_threshold(self):
+        """残余空洞小于阈值时兜底不触发，避免为零星毛刺专门跑一趟。"""
+        self.strategy.channels[6].observe_no_signal(0.0, 0.0)
+        for channel in range(1, CHANNEL_COUNT + 1):
+            if channel != 6:
+                self.strategy.channels[channel].mark_cleared(0.0)
+        # 抬高阈值使残余不达标。
+        tight = Problem3Strategy(_DummyContext(),
+                                Problem3Config(backstop_min_hole_m2=1.0e12))
+        tight.channels[6].observe_no_signal(0.0, 0.0)
+        for channel in range(1, CHANNEL_COUNT + 1):
+            if channel != 6:
+                tight.channels[channel].mark_cleared(0.0)
+        self.assertIsNone(tight._backstop_search_plan(5))
+
+    def test_backstop_targets_largest_connected_hole(self):
+        """存在大块残余空洞时，兜底选点必须朝空洞走，而不是停在已扫过的中心。"""
+        # 只在中心做一次无信号：残余是半径 1800 圆挖掉半径 1000 圆的大环带。
+        self.strategy.channels[6].observe_no_signal(0.0, 0.0)
+        for channel in range(1, CHANNEL_COUNT + 1):
+            if channel != 6:
+                self.strategy.channels[channel].mark_cleared(0.0)
+        plan = self.strategy._backstop_search_plan(5)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.kind, 'backstop')
+        # 选点必须朝外走向环带（残余区域在半径 1000 m 以外），而不是停在原点。
+        self.assertGreater(np.hypot(plan.waypoint[0], plan.waypoint[1]), 900.0)
+
+    def test_connected_clusters_separates_distant_groups(self):
+        """连通聚类必须把相距很远的点分到不同簇。"""
+        points = np.array([[0.0, 0.0], [10.0, 0.0], [5000.0, 5000.0]])
+        clusters = Problem3Strategy._connected_clusters(points, 100.0)
+        self.assertEqual(len(clusters), 2)
+        self.assertEqual(sorted(len(cluster) for cluster in clusters), [1, 2])
+
+    def test_connected_clusters_empty_input(self):
+        """空输入返回空列表，不得抛异常。"""
+        self.assertEqual(Problem3Strategy._connected_clusters(np.empty((0, 2)), 100.0), [])
 
 
 class _DummyContext:
