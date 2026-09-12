@@ -6,11 +6,11 @@
 | --- | --- | --- |
 | `practice_p4_L1.{png,svg}` | **官方模拟器真实演练**（14:15，4全向+6定向共10源） | 10/10 清除、`all_channels_resolved`、虚拟 33005 s；记录 `output/Problem4/mission_p4_20260911-141541.json` |
 | `practice_p4_L2.{png,svg}` | **官方模拟器真实演练**（21:21，6全向+9定向共15源） | 15/15 清除、`all_channels_resolved`、635 动作、虚拟 14694.8 s；记录 `output/Problem4/mission_p4_20260911-212119.json`。该局使用宽步长但 `tracking_limit=8`，不能单独证明 `tracking_limit=2` 的收益 |
-| `mission_all_channels_resolved.{png,svg}` | 离线 `--sources 12 --seed 1 --figures` | 混合12源（6个定向），12/12清除 + 8频道证书判为不存在；记录 `output/protocol/offline-mission_p4_20260911-142326.json` |
-| `mission_cleared_limit.{png,svg}` | 离线 `--sources 16 --seed 1 --directional 0 --figures` | 全向16源，清满上界收工；记录 `output/protocol/offline-mission_p4_20260911-142336.json` |
+| `mission_all_channels_resolved.{png,svg}` | 离线 `--sources 12 --seed 1 --figures` | 混合12源（6个定向），12/12清除 + 8频道证书判为不存在；原始离线记录已随 2026-09-12 离线记录清理删除 |
+| `mission_cleared_limit.{png,svg}` | 离线 `--sources 16 --seed 1 --directional 0 --figures` | 全向16源，清满上界收工；原始离线记录已随 2026-09-12 离线记录清理删除 |
 
-离线记录一律落在 `output/protocol/`（不是 `output/Problem4/`），在线演练记录才在 `output/Problem4/`；
-约定与清单见 `output/README.md`、`output/protocol/README.md`。
+在线演练记录在 `output/Problem4/`；离线记录已不再保留（2026-09-12 起测试一律以服务器演练模式为准，
+历史离线记录彻底删除，离线 CLI 产物加入 `.gitignore`）。约定见 `output/README.md`、`output/protocol/README.md`。
 
 真实演练那张只有轨迹、证据、收敛、时间四幅，**没有干扰源星号**（真值只在测试端）；其余读法完全相同。
 
@@ -40,7 +40,7 @@ python -m codes.problem4_plotting "output/Problem4/mission_p4_时间戳.json" --
 ## 能怎么用、不能怎么用
 
 **可以用**：
-- 算法自检：每改一次参数就重跑 `--figures`，对比 (b) 是否更快满覆盖、(c) 是否更快跌破20 m、(d) 的移动占比是否下降。
+- 算法自检：只用于验证"改动后图仍正常生成、判定链路没坏"（正确性）；性能与参数对比一律以服务器演练模式实测为准，不再用离线图做调参依据。
 - 方法示意插图：把 (a) 或 (d) 作为"算法行为"示意放进论文/答辩，图注必须写明"本地桩离线案例，非官方演练成绩"。
 - 讲解策略：向队友说明"为什么不沿示向线直走而要走横向视差"，(a) 比文字直观。
 

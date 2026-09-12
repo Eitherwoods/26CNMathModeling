@@ -2,6 +2,10 @@
 
 本轮完成实现、测试与离线自检，未连接官方模拟器。建模审查见 `REVIEW-Q4-2026-09-11.md`。
 
+> **测试策略变更（2026-09-12）**：此后测试一律在服务器"演练模式"进行，本地只保留正确性单元测试，
+> 不再做离线仿真/基准/扫档。本文中的离线桩基准数字为历史记录，原始离线记录文件已删除
+> （见 `output/README.md`），性能评价以 `output/Problem4/` 的演练记录为准。
+
 ## 模型与文件
 
 | 文件 | 用途 |
@@ -53,18 +57,20 @@ $env:RUN_PROBLEM4_E2E = '1'                                            # 开启�
 Remove-Item Env:\RUN_PROBLEM4_E2E
 ```
 
-离线案例自检（默认一半定向、一半全向；`--directional 0` 为纯全向）：
+离线 CLI 仅作故障排查用（默认一半定向、一半全向；`--directional 0` 为纯全向），
+日常性能与参数评价一律以服务器演练模式实测为准（2026-09-12 起）：
 
 ```powershell
 & 'E:\Python\python.exe' -m codes.problem4_solution --sources 12 --seed 1 --figures
 & 'E:\Python\python.exe' -m codes.problem4_solution --sources 16 --seed 1 --directional 0 --figures
 ```
 
-**记录落盘位置**按 `output/README.md` 的约定二分：**离线自检的记录进 `output/protocol/`**
-（文件名 `offline-mission_p4_<时间戳>.json`），**在线演练/正式测试的记录进 `output/Problem4/`**
-（`mission_p4_<时间戳>.json` ＋ 界面导出的 `.txt`）。由 `config.record_dir_for()` 统一判定，
-`solve()` 按"是否跑在 `OfflineStub` 上"自动选目录并加 `offline-` 前缀，不需要人工搬；
-`output/protocol/README.md` 有目录清单，`codes.test_problem4.RecordPlacementTests` 有 3 项回归锁住这个分工。
+**记录落盘位置**：**在线演练/正式测试的记录进 `output/Problem4/`**
+（`mission_p4_<时间戳>.json` ＋ 界面导出的 `.txt`），这是唯一的正式成绩口径；
+离线 CLI 的记录带 `offline-` 前缀写进 `output/protocol/`，属本地测试产物，
+已加入 `.gitignore` 不再保留。由 `config.record_dir_for()` 统一判定，
+`solve()` 按"是否跑在 `OfflineStub` 上"自动选目录，不需要人工搬；
+`codes.test_problem4.RecordPlacementTests` 有 3 项回归锁住这个分工。
 
 已实际跑出的结果。**官方模拟器真实演练**（14:15 执行，4全向+6定向共10源）：
 
@@ -91,8 +97,8 @@ Remove-Item Env:\RUN_PROBLEM4_E2E
 | 全向10源 种子1/2 | 10/10 | 631/639 | ~59 km | 15544/15632 s | `all_channels_resolved` | 0 |
 | 边界朝外5源 | 5/5 | 675 | 40928 m | 12188 s | `all_channels_resolved` | 0 |
 
-已存档的离线记录（均在 `output/protocol/`）：`offline-mission_p4_20260911-135016.json`（12源，优化前）、
-`-135134.json`（16源，优化前）、`-142326.json`（12源，优化后）、`-142336.json`（16源，优化后）。
+上表对应的离线记录原存档于 `output/protocol/`（`offline-mission_p4_*.json`，优化前后各两份），
+已随 2026-09-12 离线记录清理删除；数字以本表与 git 历史为准。
 
 10源案例的关键交叉验证：被证书判为"不存在"的10个频道与真实源集合**交集为空**，且每个频道都完成全部37个顶点的无信号检测（已写成 `test_exclusion_certificate_matches_hidden_truth`）。
 

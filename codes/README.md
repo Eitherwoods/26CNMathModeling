@@ -4,6 +4,17 @@
 实现问题一、二几何求解，以及 HTTP 协议封装、离线响应与状态机验证，并提供后续问题3/4算法接入入口。
 Python 3.9+，无第三方依赖。
 
+## 测试策略（2026-09-12 起，用户指定）
+
+- **性能与参数评价一律以服务器"演练模式"实测为准**（`--mode practice` 或 `gui_autopilot` 全自动）；
+  不在本地做离线仿真、基准或扫档。
+- 本地只保留**正确性单元测试**两套：`python -m unittest codes.test_problem3 -v`、
+  `python -m unittest codes.test_problem4 -v`（协议层另保留 `codes.test_protocol`）。
+  测试通过即直接跑线上演练。
+- 离线桩（`offline_stub.py`）降级为协议测试替身，仅服务单元测试与接入冒烟；
+  其 CLI 仿真与 `benchmark_*` 工具仅作故障排查。历史离线测试记录已于 2026-09-12 彻底删除，
+  `offline-*`、`test-*.jsonl` 等本地测试产物已加入 `.gitignore`，不再入库。
+
 ## 运行
 
 在项目根目录 `D:\数模\AAA26国赛\26CNMathModeling` 执行，不能先进入 `codes` 目录：
@@ -16,7 +27,8 @@ python -m unittest codes.test_problem2 -v
 ```
 
 演示使用内存桩，无网络连接；默认将请求和响应追加至
-`output/protocol/offline-p3.jsonl`。每局动作ID使用UUID，不读取账号密码。
+`output/protocol/offline-*.jsonl`（本地测试产物，已加入 `.gitignore`，不再入库）。
+每局动作ID使用UUID，不读取账号密码。
 验证套件另有一项真实HTTP传输检查：自行创建 `127.0.0.1:0` 临时服务，取得系统
 分配的端口后连接该桩，完成后关闭；不会连接2026端口或启动官方模拟器。
 
@@ -167,35 +179,33 @@ context另发HTTP。measure/clear进入时间预留区会抛BudgetReached，由�
 其他算法/协议异常直接传播，入口不擅自继续动作。正常return不等于已经清除所有目标，
 任务完成判据由具体算法负责。预留时间也不能保证在网络故障时成功退出。
 
-实现文件后，先在离线桩上调用：
+实现文件后，先在离线桩上做一次冒烟（这属于允许的本地正确性验证）：
 
 ```powershell
 python -m codes.run_robot --mode offline --problem 3 --strategy codes.strategy_p3:solve
 ```
 
-确认算法可用后，把上面的演练命令中的 `--strategy codes.strategy_demo:solve`
+确认冒烟通过后，把上面的演练命令中的 `--strategy codes.strategy_demo:solve`
 替换成 `--strategy codes.strategy_p3:solve`；问题4同理使用对应文件和编号。
 问题三的 `codes/strategy_p3.py` 已实现（转发到 `problem3_solution`）；
-问题四入口为 `codes.strategy_p4:solve`（转发到 `problem4_solution`），已实现并通过离线自检。
+问题四入口为 `codes.strategy_p4:solve`（转发到 `problem4_solution`），已实现并多局演练验证。
 `--strategy`会导入并执行本地Python代码，只填写自己信任的模块。
 
-## 问题三运行与自检
+## 问题三本地自检
 
-问题三同样不依赖官方模拟器即可自检。模型与流程见 `solutions/problem3_flow.md`，
+本地只跑正确性单元测试（性能评价一律上服务器演练模式）。
+模型与流程见 `solutions/problem3_flow.md`，
 建模审核结论与修正意见见 `solutions/REVIEW-Q3-2026-09-11.md`。
 
 ```powershell
 python -m unittest codes.test_problem3 -v
-python -m codes.problem3_solution --seed 7 --sources 12
-python -m codes.problem3_solution --seed 7 --sources 12 --figures
 ```
 
-命令行入口使用本地桩 `OfflineStub` 与 `codes/scenario.py` 生成的案例，
-统计量写入 `output/Problem3/`，`--figures` 时另存 `figures/Problem3/`。
-**这些统计量不是官方演练成绩**，只用于验证"模型 + 策略 + 桩 + 绘图"链路可用。
-按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
+`problem3_solution.py` 的离线 CLI（`--seed/--sources` 等）使用本地桩 `OfflineStub`
+与 `codes/scenario.py` 生成的案例，仅作故障排查用；其统计量**不是官方演练成绩**，
+记录不再保留。按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
 
-## 问题四代码与离线自检
+## 问题四代码与本地自检
 
 建模审查见 `solutions/REVIEW-Q4-2026-09-11.md`，实现、近似边界与运行结果见
 `solutions/problem4_flow.md`。文件职责：
@@ -208,25 +218,23 @@ python -m codes.problem3_solution --seed 7 --sources 12 --figures
 | `scenario_p4.py` | 混合朝向与边界朝外案例工厂；真值仅供测试端使用。 |
 | `test_problem4.py` | 49 项单元、入口、绘图、记录落盘与离线端到端测试。 |
 
-问题四同样不依赖官方模拟器即可自检。默认案例是一半定向、一半全向的12源混合案例：
+问题四本地同样只跑正确性单元测试（默认案例是一半定向、一半全向的12源混合案例）：
 
 ```powershell
-python -m unittest codes.test_problem4 -v                 # 49 项（默认跳过 5 项端到端）
-$env:RUN_PROBLEM4_E2E = '1'                               # 需要端到端时显式开启
-python -m unittest codes.test_problem4 -v
-Remove-Item Env:\RUN_PROBLEM4_E2E
-python -m codes.problem4_solution --sources 12 --seed 1 --figures
-python -m codes.problem4_solution --sources 12 --seed 1 --directional 0    # 全向案例
+python -m unittest codes.test_problem4 -v    # 默认跳过 5 项端到端；$env:RUN_PROBLEM4_E2E='1' 显式开启
 ```
 
-任务记录按 `output/README.md` 的约定二分：**离线自检进 `output/protocol/`**（文件名带
-`offline-` 前缀），**在线演练/正式测试进 `output/Problem4/`**；任务图一律进
-`figures/Problem4/`。离线统计量**不是官方演练成绩**。目录清单见 `output/protocol/README.md`；
-落盘目录由 `config.record_dir_for()` 决定，`problem4_solution.solve()` 按"是否跑在
-`OfflineStub` 上"自动选择，不需要人工搬。已有记录也可单独汇总真实总数（演练结束后才能知道）：
+`problem4_solution.py` 的离线 CLI（`--sources/--seed/--directional` 等）仅作故障排查；
+其统计量**不是官方演练成绩**，记录不再保留。
+
+**记录落盘**：在线演练/正式测试的记录进 `output/Problem4/`（`mission_p4_<时间戳>.json`），
+任务图一律进 `figures/Problem4/`；离线 CLI 的记录带 `offline-` 前缀写入 `output/protocol/`
+但已加入 `.gitignore`，不再保留。落盘目录由 `config.record_dir_for()` 决定，
+`problem4_solution.solve()` 按"是否跑在 `OfflineStub` 上"自动选择，不需要人工搬。
+演练记录也可单独汇总真实总数（演练结束后才能知道）：
 
 ```powershell
-python -m codes.problem4_solution "output/protocol/offline-mission_p4_时间戳.json" --true-total 12
+python -m codes.problem4_solution "output/Problem4/mission_p4_时间戳.json" --true-total 12
 ```
 
 **动作数远高于问题三，但不构成真实时间风险**：排除证据要求每个频道在全部 37 个搜索
@@ -239,7 +247,7 @@ python -m codes.problem4_solution "output/protocol/offline-mission_p4_时间戳.
 为了让边界朝外的定向源也能被正面看到）。**这一点已被 14:15 首局真实演练确认接受**——最远
 2700 m 的 187 个区域外动作全部 accepted，方案不必再改。演练命令见 `tester/runq4.txt` 与
 `solutions/problem4_flow.md`；图怎么读见 `figures/Problem4/README.md`。演练后可从记录直接重画
-（在线记录在 `output/Problem4/`，离线记录在 `output/protocol/`，两者命令相同）：
+（在线记录在 `output/Problem4/`）：
 
 ```powershell
 python -m codes.problem4_plotting "output/Problem4/mission_p4_时间戳.json" --name practice_p4_L2
@@ -266,4 +274,4 @@ HTTP传输需显式构造 `HttpTransport(base_url, allow_network=True)` 并传�
 不复刻官方空间误差场、案例生成分布、认证、加密日志、窗口关闭和资源保护。
 不实施所有HTTP头、嵌套深度和流量规则；这部分应以附件为准。
 官方会话到期和exit后可能直接关闭接口；桩保留缓存以便单独检查重放逻辑。
-目前仅能证明通信与状态逻辑在这些离线场景中通过，尚未完成官方演练联调。
+官方演练已多局联调通过；桩的结论仍仅覆盖通信与状态逻辑，不能外推成绩。

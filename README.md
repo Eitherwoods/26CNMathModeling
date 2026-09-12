@@ -1,6 +1,6 @@
 # 2026 CUMCM 国赛 B 题：无线电干扰源定位与清除
 
-本项目为 2026 年全国大学生数学建模竞赛 B 题的完整参赛工程，包含四个问题的模型与求解代码、与官方模拟器的 HTTP 协议实现、离线自检与演练自动化工具、论文图件与 LaTeX 正文。
+本项目为 2026 年全国大学生数学建模竞赛 B 题的完整参赛工程，包含四个问题的模型与求解代码、与官方模拟器的 HTTP 协议实现、正确性单元测试与演练自动化工具、论文图件与 LaTeX 正文。
 
 **主线模型**：以"动态检测与清除寻路算法"贯穿问题三、四——问题一建立角域交会与最小定位区域算法，问题二建立纯几何检测价值与第二检测点求解，问题三在源数未知的条件下引入行进距离与候选点集的精确最短路线，问题四扩展至定向源（联合位置×类型×接收半径×朝向的保守外包）。总建模方案见 [solutions/modeling-strategy.md](solutions/modeling-strategy.md)。
 
@@ -12,7 +12,7 @@
 | `solutions/` | 建模方案与流程文档：总方案、问题 2/3/4 分问流程、审查记录（`REVIEW-*.md`）、题目原文（`Question-B/`） |
 | `body/` | 论文 LaTeX 工程（`main.tex` + `cumcmthesis.cls`），编译产物 `main.pdf` |
 | `figures/` | 论文插图，按问题分目录，PNG 预览 + SVG 论文版（总索引见 [figures/README.md](figures/README.md)） |
-| `output/` | 运行结果：离线自检进 `output/protocol/`，在线演练/正式记录进 `output/Problem3|4/`（约定见 [output/README.md](output/README.md)） |
+| `output/` | 运行结果：演练协议日志进 `output/protocol/`，在线演练任务记录进 `output/Problem3\|4/`（约定见 [output/README.md](output/README.md)） |
 | `tester/` | 官方模拟器 `jammers-simulator.exe`、演练命令（`runq3.txt`/`runq4.txt`）、演练自动化说明、模拟器数据 |
 
 ## 环境要求
@@ -41,20 +41,16 @@ python -m unittest codes.test_problem2 -v
 
 结果写入 `output/Problem2/problem2_results.json`，候选区域图写入 `figures/Problem2/`。
 
-### 问题三 / 问题四：离线自检
+### 问题三 / 问题四：本地正确性自检（只做这一步，然后直接上演练）
 
-两问均不依赖官方模拟器即可自检（离线桩 `offline_stub.py` + 本地案例工厂）：
+**测试策略（2026-09-12 起）**：性能与参数评价一律以**服务器"演练模式"实测为准**；本地只保留下面两套单元测试验证代码正确性，通过后直接跑线上演练，不再做本地离线仿真、基准或扫档。历史离线测试记录已于 2026-09-12 彻底删除，`offline-*`、`test-*.jsonl` 等本地测试产物已加入 `.gitignore`，不再入库。
 
 ```powershell
 python -m unittest codes.test_problem3 -v
-python -m codes.problem3_solution --seed 7 --sources 12 --figures
-
-python -m unittest codes.test_problem4 -v                # 49 项（5 项端到端默认跳过）
-$env:RUN_PROBLEM4_E2E = '1'                              # 需要端到端时显式开启
-python -m codes.problem4_solution --sources 12 --seed 1 --figures
+python -m unittest codes.test_problem4 -v    # 5 项端到端默认跳过，$env:RUN_PROBLEM4_E2E='1' 显式开启
 ```
 
-**注意**：离线统计量不是官方演练成绩，仅验证"模型 + 策略 + 桩 + 绘图"链路可用。
+**注意**：离线桩只是协议测试替身，其统计量不是官方演练成绩；`problem3/4_solution` 的离线 CLI 仅作故障排查用，不再作为常规测试流程，其记录不再保留。
 
 ### 连接官方模拟器进行演练
 
@@ -98,7 +94,7 @@ run_robot.py（入口，默认离线）
 协议层四个接口：`enter()`、`measure(x,y,channel)`、`clear(x,y,channel)`、`exit()`。
 算法通过 `context.measure/clear/state/should_stop()` 与模拟器交互，不自行发送 HTTP、不调用 enter/exit。接入方式与接口表详见 [codes/README.md](codes/README.md)。
 
-各问题测试文件：`test_problem1~4.py`、`test_protocol.py`（计时、丢包、拒绝、超时、边界与 HTTP 传输检查）、`test_strategy.py`、`benchmark_problem3/4.py`（性能基准）。
+各问题测试文件：`test_problem1~4.py`、`test_protocol.py`（计时、丢包、拒绝、超时、边界与 HTTP 传输检查）、`test_strategy.py`；`benchmark_problem3/4.py` 等离线基准工具仅保留作排查，不再作为常规测试流程（见上文测试策略）。
 
 ## 文档索引
 
@@ -109,7 +105,7 @@ run_robot.py（入口，默认离线）
 | [solutions/REVIEW-2026-09-10.md](solutions/REVIEW-2026-09-10.md) 等 `REVIEW-*.md` | 分问建模审查结论与修正意见 |
 | [codes/README.md](codes/README.md) | 通信层、离线桩、演练流程与代码接入的完整说明 |
 | [figures/README.md](figures/README.md) | 图件总索引（数据来源、可支持结论、论文建议位置） |
-| [output/README.md](output/README.md) | 输出目录约定（离线 vs 在线二分） |
+| [output/README.md](output/README.md) | 输出目录约定（演练记录 vs 本地结果） |
 | [tester/README.md](tester/README.md) | 模拟器与演练自动化技术说明 |
 
 ## 红线与注意事项
@@ -117,5 +113,6 @@ run_robot.py（入口，默认离线）
 - **正式测试**不在本工程自动化范围内：任何代码路径都不得触碰模拟器界面的"正式测试"入口；四个 HTTP 接口无法判断演练/正式，必须由人工在界面上核实处于演练后再运行。
 - `--confirm-practice` 是用户确认标志，不是程序检测到演练的证据；网络层只接受明确的回环 HTTP 地址，禁止环境代理与重定向。
 - 离线桩是协议测试替身而非官方模拟器复刻，其统计量不能作为题面要求的演练成绩。
+- **测试一律在服务器"演练模式"进行（2026-09-12 起）**：本地只保留正确性单元测试，通过后直接上演练；不再执行本地离线基准/扫档，历史离线记录已彻底删除。
 - 出现 pending 动作或异常时，入口会停止并保留日志；恢复只能用原 client 的 `retry_pending()`，不要重建客户端"跳过"不确定动作。
 - `tester/JammersSimulatorData/` 下的 sqlite 队列文件是模拟器运行数据，随演练更新，属正常现象。
