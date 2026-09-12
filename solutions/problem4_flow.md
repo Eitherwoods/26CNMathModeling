@@ -2,6 +2,10 @@
 
 本轮完成实现、测试与离线自检，未连接官方模拟器。建模审查见 `REVIEW-Q4-2026-09-11.md`。
 
+> **测试策略变更（2026-09-12）**：此后测试一律在服务器"演练模式"进行，本地只保留正确性单元测试，
+> 不再做离线仿真/基准/扫档。本文中的离线桩基准数字为历史记录，原始离线记录文件已删除
+> （见 `output/README.md`），性能评价以 `output/Problem4/` 的演练记录为准。
+
 ## 模型与文件
 
 | 文件 | 用途 |
@@ -53,18 +57,20 @@ $env:RUN_PROBLEM4_E2E = '1'                                            # 开启�
 Remove-Item Env:\RUN_PROBLEM4_E2E
 ```
 
-离线案例自检（默认一半定向、一半全向；`--directional 0` 为纯全向）：
+离线 CLI 仅作故障排查用（默认一半定向、一半全向；`--directional 0` 为纯全向），
+日常性能与参数评价一律以服务器演练模式实测为准（2026-09-12 起）：
 
 ```powershell
 & 'E:\Python\python.exe' -m codes.problem4_solution --sources 12 --seed 1 --figures
 & 'E:\Python\python.exe' -m codes.problem4_solution --sources 16 --seed 1 --directional 0 --figures
 ```
 
-**记录落盘位置**按 `output/README.md` 的约定二分：**离线自检的记录进 `output/protocol/`**
-（文件名 `offline-mission_p4_<时间戳>.json`），**在线演练/正式测试的记录进 `output/Problem4/`**
-（`mission_p4_<时间戳>.json` ＋ 界面导出的 `.txt`）。由 `config.record_dir_for()` 统一判定，
-`solve()` 按"是否跑在 `OfflineStub` 上"自动选目录并加 `offline-` 前缀，不需要人工搬；
-`output/protocol/README.md` 有目录清单，`codes.test_problem4.RecordPlacementTests` 有 3 项回归锁住这个分工。
+**记录落盘位置**：**在线演练/正式测试的记录进 `output/Problem4/`**
+（`mission_p4_<时间戳>.json` ＋ 界面导出的 `.txt`），这是唯一的正式成绩口径；
+离线 CLI 的记录带 `offline-` 前缀写进 `output/protocol/`，属本地测试产物，
+已加入 `.gitignore` 不再保留。由 `config.record_dir_for()` 统一判定，
+`solve()` 按"是否跑在 `OfflineStub` 上"自动选目录，不需要人工搬；
+`codes.test_problem4.RecordPlacementTests` 有 3 项回归锁住这个分工。
 
 已实际跑出的结果。**官方模拟器真实演练**（14:15 执行，4全向+6定向共10源）：
 
@@ -91,8 +97,8 @@ Remove-Item Env:\RUN_PROBLEM4_E2E
 | 全向10源 种子1/2 | 10/10 | 631/639 | ~59 km | 15544/15632 s | `all_channels_resolved` | 0 |
 | 边界朝外5源 | 5/5 | 675 | 40928 m | 12188 s | `all_channels_resolved` | 0 |
 
-已存档的离线记录（均在 `output/protocol/`）：`offline-mission_p4_20260911-135016.json`（12源，优化前）、
-`-135134.json`（16源，优化前）、`-142326.json`（12源，优化后）、`-142336.json`（16源，优化后）。
+上表对应的离线记录原存档于 `output/protocol/`（`offline-mission_p4_*.json`，优化前后各两份），
+已随 2026-09-12 离线记录清理删除；数字以本表与 git 历史为准。
 
 10源案例的关键交叉验证：被证书判为"不存在"的10个频道与真实源集合**交集为空**，且每个频道都完成全部37个顶点的无信号检测（已写成 `test_exclusion_certificate_matches_hidden_truth`）。
 
@@ -331,3 +337,49 @@ AI 不得以任何方式发起。
 其中12仅为命令参数示例，须替换为该次演练真实总数。程序运行时长是策略侧记录；论文正式结果仍以模拟器导出的记录为准。
 
 其余限制：位置格距不能任意增大，必须使 $h\sqrt{2}/2<20$；首版固定网格与参数尚未调优；证书采样用的是500 m 网格（实际判据用整域格点），仅用于回归。官方模拟器演练与正式测试仍按既有运行器及人工界面流程进行，`codes/README.md` 的演练章节为准。
+
+## 动态 2-opt 搜索巡回（2026-09-12 联调采纳，11 案例合计 −7.7%）
+
+### 动机与实现
+
+28 顶点优化布站下，混合 12 源案例的行进有约六成落在搜索顶点上；实测"最近未覆盖
+顶点"贪心的静态巡回长 23825 m，而同顶点集的 2-opt 开放路只有 20841 m（−14.3%）。
+原 `rolling_search_route` 开关（每次搜索决策时对"尚有未覆盖频道的顶点"从当前位置
+重排 `open_route_order` 最优开放路并执行首站）已存在但默认关闭；本轮将其默认开启
+（`Problem4Config.rolling_search_route = True`）。与静态 `search_route='tour'` 的
+区别在于：追踪中断返回后，动态重排自然从当前位置继续最优方向，不会按固定次序
+"抄近路失败"。只改访问顺序，不改顶点集合，覆盖证书与完成判据不受影响。
+
+### 证据（OfflineStub location_error_deg=0.9，非官方成绩）
+
+| 配置 | 11 案例合计虚拟时间 | 每源 | 完成 |
+| --- | --- | --- | --- |
+| 基线（greedy 最近未覆盖） | 84969.8 s | 602.6 s | 11/11 |
+| **rolling 2-opt（采纳）** | **78448.7 s** | **556.4 s** | **11/11** |
+| rolling + 阈值 4 Clears 才启用 | 79242.6 s | 562.0 s | 11/11 |
+
+留出验证（7 个与基准不相交的案例）：greedy 598.9 s/源 → rolling **567.7 s/源（−5.2%）**，
+7/7 完成。同一 run 内逐位可复现（重复运行合计差异为 0）。`codes.test_problem4`
+61 项（含 E2E 跳过口径）全部通过。
+
+### 同轮证伪记录（重要——勿重试）
+
+- **`adaptive_search_evidence=True`**（方向性覆盖证据提前排除未知频道）：
+  与基线逐位相同。全向先验下，"某位置某朝向可能存在"无法由现有站点无信号
+  读数排除，掩码不会在任何一局的收尾前清空，机制等于未启用。
+- **顶点缩减（28 → 27/26）**：删除单点 3 后 27 顶点证书不变（C1=563.7 m、
+  空隙 174.0° 不变），合计 −644 s（−0.8%）；再删顶点 8 收益被巡回变长吃掉
+  （78394 s ≈ 打平）。收益边际而需重做密采样验证并改动测试锚点，不采纳。
+- **先扫完巡回再追踪（`finish_detected_before_search=False`, interval=1/4）**：
+  在 rolling 新基线上重测仍差 +18.8% / +9.8% —— "一发现即追踪"的两阶段
+  架构在该问题形态下依旧优于批量发现。
+- 若干旧参数在新基线上的坐标复测（adaptive low=6/high=20、hypothesis=80、
+  info=0.008、宽步长变体）均无显著改进，维持原默认值。
+
+### 滚动巡回的演练验证（2026-09-12 16:33，autopilot 全自动 1 局）
+
+`output/Problem4/mission_p4_20260912-163335.json`：案例 10 源（2 全向 + **8 定向**，
+定向占比最高的案例类型），**10/10 清除**、`all_channels_resolved`、规划异常 0、
+529 动作、行进 32.1 km、**9271.5 s（927.2 s/源）**、真实墙钟 6.6 s。与历史各局
+源数/定向占比均不同，不能配对比较；本局的价值在于确认滚动 2-opt 巡回在官方
+误差场下完整收尾、无异常。

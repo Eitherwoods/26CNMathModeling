@@ -47,7 +47,16 @@ class Problem4Config:
     exit_reserve_s: float = settings.PROBLEM4_EXIT_RESERVE_S
     step_lengths_m: tuple = settings.PROBLEM4_STEP_LENGTHS_M
     search_route: str = settings.PROBLEM4_SEARCH_ROUTE
+<<<<<<< HEAD
     rolling_search_route: bool = False
+=======
+    # 动态 2-opt 搜索巡回（2026-09-12 采纳，11 案例合计 −7.7%）：每次进入搜索
+    # 决策时，对"尚有未覆盖频道的顶点"从当前位置重排最优开放路并执行首站，
+    # 替代固定的"最近未覆盖顶点"贪心。静态 2-opt 比 greedy 短 14.3%（28 顶点
+    # 23825→20841 m），动态重排在追踪中断后能自然回到最优续行方向。
+    # 只改访问顺序，不改顶点集合，覆盖证书与完成判据不受影响。
+    rolling_search_route: bool = True
+>>>>>>> b15e9cf5f3b345ae6a2e9132e036edb8871ea08f
     rolling_route_min_clears: int = 0
     adaptive_initial_direction: bool = False
     tracking_path_limit_m: float = 0.0

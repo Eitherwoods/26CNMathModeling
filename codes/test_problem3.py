@@ -899,6 +899,45 @@ class TurnPenaltyTests(unittest.TestCase):
         self.assertAlmostEqual(self.strategy.last_move_bearing_deg, -90.0, places=6)
 
 
+<<<<<<< HEAD
+=======
+class RendezvousChaseTests(unittest.TestCase):
+    """双站交会追击：门控默认关闭；开启时按锚点侧向生成第二站候选。"""
+
+    def setUp(self):
+        """构造停在原点、频道1已取得一次沿 +x 示向读数的最小策略。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+        self.strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.0, 'virtual_time_s': 5.0})
+
+    def test_disabled_by_default_generates_no_rendezvous_options(self):
+        """默认关闭：追击选项中不得出现双站交会候选。"""
+        options = self.strategy._chase_options()
+        self.assertTrue(all('双站交会' not in plan.note for plan in options))
+
+    def test_enabled_generates_symmetric_perpendicular_candidates(self):
+        """开启后按两侧对称偏距生成候选，且与追击选项同一评分尺度。"""
+        self.strategy.config = Problem3Config(rendezvous_chase=True,
+                                              rendezvous_offsets_m=(600.0,))
+        options = self.strategy._rendezvous_options(1, self.strategy.channels[1])
+        self.assertEqual(len(options), 2)
+        self.assertEqual({plan.kind for plan in options}, {'chase'})
+        self.assertEqual({plan.target_channel for plan in options}, {1})
+        self.assertEqual({(float(plan.waypoint[0]), round(float(plan.waypoint[1]), 6))
+                          for plan in options}, {(0.0, 600.0), (0.0, -600.0)})
+        for plan in options:
+            self.assertTrue(np.isfinite(plan.score_s))
+            self.assertIn(1, plan.measures)
+
+    def test_invalid_offsets_rejected(self):
+        """非正或非有限偏距必须在构造期拒绝。"""
+        for offsets in ((0.0,), (-1.0, 2.0), (float('nan'),)):
+            with self.assertRaises(ValueError):
+                Problem3Config(rendezvous_offsets_m=offsets)
+
+
+>>>>>>> b15e9cf5f3b345ae6a2e9132e036edb8871ea08f
 class OfflineEndToEndTests(unittest.TestCase):
     """离线端到端：固定案例必须全部清除；轮次与停滞保护必须生效。"""
 

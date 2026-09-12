@@ -70,3 +70,10 @@ body/Thesis.bbl
 body/Thesis.synctex(busy)
 
 logs/
+
+# 本地测试产物：2026-09-12 起测试一律在服务器演练模式进行，
+# 本地只保留正确性单元测试，离线自检/基准记录不再保留、不再入库
+output/protocol/offline-*
+output/protocol/test-*.jsonl
+# 模拟器内部原始行为日志不入库
+tester/JammersSimulatorData/
