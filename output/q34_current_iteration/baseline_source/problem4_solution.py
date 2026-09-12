@@ -18,8 +18,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from .base_models import (open_route_order, adaptive_directions, bounded_candidates,
-                          bearing_intersection, directional_coverage_complete)
+from .base_models import open_route_order, adaptive_directions, bounded_candidates
 
 from . import config as settings
 from .problem3_model import Lattice
@@ -55,21 +54,12 @@ class Problem4Config:
     # 只改访问顺序，不改顶点集合，覆盖证书与完成判据不受影响。
     rolling_search_route: bool = True
     rolling_route_min_clears: int = 0
-    search_route_starts: int = 1
     adaptive_initial_direction: bool = False
-    tracking_path_limit_m: float = settings.PROBLEM4_TRACKING_PATH_LIMIT_M
+    tracking_path_limit_m: float = 0.0
     allocation_by_region: bool = False
-    allocation_by_plan: bool = settings.PROBLEM4_ALLOCATION_BY_PLAN
     opportunistic_search: bool = False
     tracking_travel_weight: float = 0.0
     adaptive_search_evidence: bool = False
-    continuous_search_evidence: bool = False
-    # 与 q3 共用示向交会候选；试探失败只按实际清除反馈收缩外包。
-    lls_probe: bool = False
-    lls_probe_min_reads: int = 2
-    lls_probe_max_mask_dist_m: float = 200.0
-    lls_probe_min_separation_m: float = 25.0
-    fallback_center_first: bool = False
     # 区域中心选法：'bbox'=外包盒中心；'mec'=最小包围圆近似中心（候选点，
     # 可靠清除仍由全体单元距离判据把关）。追踪候选可附加定距接近环；
     # 后备清除停靠时可选择性顺带测量已发现频道。
@@ -91,22 +81,8 @@ class Problem4Config:
 
     def __post_init__(self):
         """在任何动作之前拒绝破坏几何保证或调度活性的参数。"""
-        if type(self.search_route_starts) is not int or not 1 <= self.search_route_starts <= 8:
-            raise ValueError('搜索路径初始化次数必须为1到8的整数。')
-        if not isinstance(self.lls_probe, bool):
-            raise ValueError('lls_probe 必须为布尔值。')
-        if not isinstance(self.fallback_center_first, bool):
-            raise ValueError('fallback_center_first 必须为布尔值。')
-        if (type(self.lls_probe_min_reads) is not int or self.lls_probe_min_reads < 2):
-            raise ValueError('lls_probe_min_reads 必须为不小于2的整数。')
-        if (not np.isfinite(self.lls_probe_max_mask_dist_m)
-                or self.lls_probe_max_mask_dist_m < 0):
-            raise ValueError('交会与掩码距离必须非负且有限。')
-        if (not np.isfinite(self.lls_probe_min_separation_m)
-                or self.lls_probe_min_separation_m < settings.CLEAR_RADIUS_M):
-            raise ValueError('交会试探间距不得小于清除半径。')
-        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region', 'allocation_by_plan',
-                     'opportunistic_search', 'adaptive_search_evidence', 'continuous_search_evidence'):
+        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region',
+                     'opportunistic_search', 'adaptive_search_evidence'):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f'{name} 必须为布尔值。')
         if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
@@ -229,7 +205,6 @@ class Problem4Strategy:
         self.stop_reason = 'running'
         self.search_evidence = None
         self.search_masks = {}
-        self.continuous_evidence_cache = {}
         if self.config.adaptive_search_evidence:
             from .search_evidence import DirectionalCoverage
             self.search_evidence = DirectionalCoverage(self.lattice)
@@ -272,8 +247,7 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             return None
         if (self.config.rolling_search_route and
                 sum(k.status == 'cleared' for k in self.channels.values()) >= self.config.rolling_route_min_clears):
-            order = open_route_order(self.waypoints[candidates], self.position,
-                                     starts=self.config.search_route_starts)
+            order = open_route_order(self.waypoints[candidates], self.position)
             index = candidates[order[0]]
         elif self.search_route_order is not None:
             rank = {index: order for order, index in enumerate(self.search_route_order)}
@@ -326,48 +300,19 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
                 limit = self.config.tracking_limit + self.config.adaptive_extra_rounds
         return limit
 
-    def _lls_probe_point(self, knowledge):
-        """生成可辨识交会点，经目标域、失败间距和保守位置投影护栏筛选。"""
-        if not self.config.lls_probe or knowledge.status != 'detected':
-            return None
-        readings = [(o.x, o.y, o.bearing_deg) for o in knowledge.observations
-                    if o.result == 'direction' and o.bearing_deg is not None]
-        point = bearing_intersection(readings, self.config.lls_probe_min_reads)
-        if point is None or np.linalg.norm(point) > settings.TARGET_RADIUS_M + 250.0:
-            return None
-        if any(np.linalg.norm(point - np.asarray(old)) < self.config.lls_probe_min_separation_m
-               for old in knowledge.clear_positions):
-            return None
-        points = knowledge.possible_points()
-        if (not len(points) or np.linalg.norm(points - point, axis=1).min()
-                > self.config.lls_probe_max_mask_dist_m):
-            return None
-        return point
-
-    def _fallback_point(self, knowledge):
-        """首次后备清除可先访问区域中心附近单元，失败后恢复最近单元扫描。"""
-        reference = self.position
-        if self.config.fallback_center_first and not knowledge.clear_positions:
-            center, _ = knowledge.region_estimate(self.config.clear_center_mode)
-            if center is not None:
-                reference = center
-        return knowledge.fallback_point(reference)
-
     def _tracking_plan(self, channel):
         """先限定有限追踪轮数，再转入覆盖清除，防止失联后无限往返。"""
         knowledge = self.channels[channel]
         center, _ = knowledge.region_estimate(self.config.clear_center_mode)
         if center is not None and knowledge.certain_clear(*center) and not knowledge.cleared_here(*center):
             return StopPlan(center, 'reliable_clear', channel)
-        probe = self._lls_probe_point(knowledge)
-        if probe is not None:
-            return StopPlan(probe, 'lls_probe', channel)
         if self.track_counts[channel] >= self._tracking_limit_for(knowledge):
-            point = self._fallback_point(knowledge)
+            point = knowledge.fallback_point(self.position)
             return None if point is None else StopPlan(point, 'fallback_clear', channel)
         candidates = self._tracking_candidates(knowledge)
         if not candidates:
-            point = self._fallback_point(knowledge)
+            self.track_counts[channel] = self.config.tracking_limit
+            point = knowledge.fallback_point(self.position)
             return None if point is None else StopPlan(point, 'fallback_clear', channel)
         hypotheses = knowledge.planning_hypotheses(self.config.hypothesis_limit)
         scores = [(feedback_score(hypotheses, p), p) for p in candidates]
@@ -436,22 +381,7 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
                                 and self.round % self.config.search_interval == 0))):
             plan = search
         elif detected:
-            if self.config.allocation_by_plan:
-                aged = [c for c in detected
-                        if self.round - self.last_served[c] >= self.config.fairness_age_rounds]
-                eligible = [self._next_channel(detected)] if aged else detected
-                plans = [self._tracking_plan(c) for c in eligible]
-                plans = [p for p in plans if p is not None]
-                def planned_seconds(candidate):
-                    """与 q3 同口径：实际移动时间加检测后的剩余定位规模。"""
-                    seconds = float(np.linalg.norm(candidate.waypoint - self.position)) / settings.ROBOT_SPEED_MPS
-                    if candidate.kind == 'track':
-                        hypotheses = self.channels[candidate.channel].planning_hypotheses(self.config.hypothesis_limit)
-                        seconds += feedback_score(hypotheses, candidate.waypoint)[0] / settings.ROBOT_SPEED_MPS + 60.
-                    return seconds, candidate.channel
-                plan = min(plans, key=planned_seconds) if plans else None
-            else:
-                plan = self._tracking_plan(self._next_channel(detected))
+            plan = self._tracking_plan(self._next_channel(detected))
         else:
             plan = search
         if plan is None:
@@ -550,7 +480,7 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             if knowledge.cleared_here(*point):
                 continue
             reliable = knowledge.certain_clear(*point) or knowledge.near_certain_clear(*point)
-            fallback = plan.kind in ('fallback_clear', 'lls_probe') and plan.channel == channel
+            fallback = plan.kind == 'fallback_clear' and plan.channel == channel
             if not (reliable or fallback):
                 continue
             self._check_action_budget(point, 'clear', channel)
@@ -568,15 +498,6 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         for channel, knowledge in self.channels.items():
             if knowledge.status == 'unknown' and len(self.coverage[channel]) == len(self.waypoints):
                 knowledge.status = 'excluded'
-            if self.config.continuous_search_evidence and knowledge.status == 'unknown':
-                stations = tuple(sorted({(o.x, o.y) for o in knowledge.observations
-                                         if o.result == 'no_signal'}))
-                if stations not in self.continuous_evidence_cache:
-                    self.continuous_evidence_cache[stations] = directional_coverage_complete(
-                        self.lattice.points, self.lattice.covering_radius_m, stations,
-                        settings.MIN_RECEIVE_RADIUS_M)
-                if self.continuous_evidence_cache[stations]:
-                    knowledge.status = 'excluded'
         if any(k.status == 'inconsistent' for k in self.channels.values()):
             return 'model_inconsistent'
         if sum(k.status == 'cleared' for k in self.channels.values()) == settings.MAX_SOURCE_COUNT:

@@ -15,71 +15,6 @@ from scipy.optimize import linprog
 from .config import ANGLE_ERROR_DEG, DISTANCE_TOL, PARALLEL_TOL
 
 
-def directional_coverage_complete(points, cell_radius, stations, receive_radius=1000.):
-    """连续角度覆盖证书：每个位置单元对任意朝向都有保证可读的测站。
-
-    只使用距单元中心不超过接收下界减单元半径的测站。站点方向角误差至多
-    asin(cell_radius / distance)，相邻保证可见半圆重叠即可覆盖所有朝向。
-    检查的是整个位置单元，非只检查其中心；返回 False 不代表存在目标。
-    """
-    points, stations = np.asarray(points, dtype=float), np.asarray(stations, dtype=float)
-    if (points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all()
-            or not np.isfinite([cell_radius, receive_radius]).all()
-            or not 0 <= cell_radius < receive_radius):
-        raise ValueError('覆盖证书需要有限二维位置和有效的半径。')
-    if stations.size == 0:
-        return len(points) == 0
-    if stations.ndim != 2 or stations.shape[1] != 2 or not np.isfinite(stations).all():
-        raise ValueError('覆盖测站必须为有限二维坐标。')
-    # 分块控制临时矩阵规模，不让长历史耗尽内存。
-    for first in range(0, len(points), 2048):
-        offset = stations[None, :, :] - points[first:first + 2048, None, :]
-        distance = np.linalg.norm(offset, axis=2)
-        valid = (distance > cell_radius + 1e-8) & (distance + cell_radius < receive_radius - 1e-8)
-        counts = valid.sum(axis=1)
-        if np.any(counts < 3):
-            return False
-        angles = np.where(valid, np.arctan2(offset[:, :, 1], offset[:, :, 0]), np.inf)
-        order = np.argsort(angles, axis=1, kind='stable')
-        angles = np.take_along_axis(angles, order, axis=1)
-        margins = np.arcsin(np.clip(cell_radius / np.maximum(distance, 1e-12), 0., 1.))
-        margins = np.take_along_axis(margins, order, axis=1)
-        rows = np.arange(len(counts))[:, None]
-        columns = np.arange(len(stations))[None, :]
-        next_columns = np.where(columns + 1 < counts[:, None], columns + 1, 0)
-        current_valid = columns < counts[:, None]
-        # 对无效列先清零，避免 inf-inf 的无效数值；最后只核验有效相邻对。
-        safe_angles = np.where(current_valid, angles, 0.)
-        gap = safe_angles[rows, next_columns] - safe_angles
-        gap += np.where(columns == counts[:, None] - 1, 2 * np.pi, 0.)
-        gap += margins + margins[rows, next_columns]
-        if np.any(current_valid & (gap >= np.pi - 1e-10)):
-            return False
-    return True
-
-
-def bearing_intersection(readings, min_reads=2):
-    """由测站及示向角求交会候选；缺读数、秩亏或非有限输入返回空解。
-
-    只产生启发式候选，不是误差界下的可靠定位证明。平移测站再求解可减少
-    大坐标带来的消去误差；使用 SVD 秩判定拒绝平行线的最小范数伪交点。
-    """
-    data = np.asarray(readings, dtype=float)
-    if (data.ndim != 2 or data.shape[1] != 3 or len(data) < min_reads
-            or not np.isfinite(data).all()):
-        return None
-    angles = np.deg2rad(data[:, 2] % 360.0)
-    normals = np.column_stack((-np.sin(angles), np.cos(angles)))
-    origin = data[0, :2]
-    rhs = np.einsum('ij,ij->i', normals, data[:, :2] - origin)
-    try:
-        offset, _, rank, _ = np.linalg.lstsq(normals, rhs, rcond=1e-8)
-    except np.linalg.LinAlgError:
-        return None
-    point = origin + offset
-    return point if rank == 2 and np.isfinite(point).all() else None
-
-
 def bounded_candidates(points, position, max_leg_m=0.0):
     """过滤非法坐标和超长试探路径，稳定去重；零长度限制表示关闭。"""
     if not np.isfinite(max_leg_m) or max_leg_m < 0:
@@ -114,7 +49,7 @@ def adaptive_directions(position, center, count):
     return np.column_stack((np.cos(angles), np.sin(angles)))
 
 
-def open_route_order(points, start, order=None, starts=1):
+def open_route_order(points, start, order=None):
     """确定性最近邻和开放路径2-opt；保留全部顶点，允许翻转自由末端。"""
     points = np.asarray(points, dtype=float)
     start = np.asarray(start, dtype=float)
@@ -124,28 +59,6 @@ def open_route_order(points, start, order=None, starts=1):
             or not np.isfinite(points).all() or not np.isfinite(start).all()):
         raise ValueError('路线坐标必须是有限二维坐标。')
     count = len(points)
-    if type(starts) is not int or starts < 1:
-        raise ValueError('路径初始化次数必须为正整数。')
-    if starts > 1 and count > 1:
-        # 由当前位置自适应选择若干近邻首站。保留原最近邻解，避免静态路线退化。
-        first_nodes = sorted(range(count), key=lambda i: (np.linalg.norm(points[i] - start), i))[:starts]
-        alternatives = []
-        if order is not None:
-            supplied = open_route_order(points, start, order)
-            path = np.vstack((start, points[supplied]))
-            alternatives.append((float(np.linalg.norm(np.diff(path, axis=0), axis=1).sum()), supplied))
-        for first in first_nodes:
-            pending = [i for i in range(count) if i != first]
-            initial = [first]
-            while pending:
-                index = min(pending, key=lambda i: (np.linalg.norm(points[i] - points[initial[-1]]), i))
-                initial.append(index)
-                pending.remove(index)
-            route = open_route_order(points, start, initial)
-            path = np.vstack((start, points[route]))
-            cost = float(np.linalg.norm(np.diff(path, axis=0), axis=1).sum())
-            alternatives.append((cost, route))
-        return min(alternatives, key=lambda item: (item[0], item[1]))[1]
     if order is None:
         pending, route, position = list(range(count)), [], start
         while pending:

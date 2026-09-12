@@ -45,14 +45,8 @@ CLEAR_FAIL_TIME_S = 3.0
 REAL_BUDGET_S = 1200.0
 VIRTUAL_BUDGET_S = 360000.0
 
-# q3/q4：以下为 2026-09-12 多轮扫档后的默认参数（离线 11 案例 −5.4%、
+# 问题四：以下为 2026-09-12 多轮扫档后的默认参数（离线 11 案例 −5.4%、
 # 留出 7 案例 −5.8%，全部正确完成）。优化目标是虚拟时间（机器狗耗时）。
-# 追踪默认值集中声明，保证两个求解器共享同一套路径约束口径。
-# 这些值来自当前本地 Engine 的固定 seed 复核；仍可由 ProblemNConfig 显式覆盖。
-PROBLEM3_ADAPTIVE_INITIAL_DIRECTION = True
-PROBLEM3_TRACKING_PATH_LIMIT_M = 500.0
-PROBLEM4_ALLOCATION_BY_PLAN = True
-PROBLEM4_TRACKING_PATH_LIMIT_M = 900.0
 PROBLEM4_LATTICE_SPACING_M = 20.0
 PROBLEM4_SEARCH_SPACING_M = 900.0
 PROBLEM4_ORIENTATION_BINS = 24

@@ -29,8 +29,7 @@ from dataclasses import asdict, dataclass, field, replace
 import numpy as np
 
 from . import config as settings
-from .base_models import (bearing_deg, open_route_order, adaptive_directions,
-                          bounded_candidates, bearing_intersection)
+from .base_models import bearing_deg, open_route_order, adaptive_directions, bounded_candidates
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
                      MAX_SOURCE_COUNT, MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M,
@@ -59,8 +58,8 @@ class Problem3Config:
     # 使追击顺路与补证巡航的每站信息量更高）。
     candidate_layout: str = 'hybrid15'
     lookahead_directions: int = 24
-    adaptive_initial_direction: bool = settings.PROBLEM3_ADAPTIVE_INITIAL_DIRECTION
-    tracking_path_limit_m: float = settings.PROBLEM3_TRACKING_PATH_LIMIT_M
+    adaptive_initial_direction: bool = False
+    tracking_path_limit_m: float = 0.0
     lookahead_lengths_m: tuple = (250.0, 500.0, 900.0)
     lookahead_hypotheses: int = 15
     chase_options_limit: int = 4
@@ -99,7 +98,6 @@ class Problem3Config:
     # 取改进后与原序列的较小总耗时。
     absence_route_2opt: bool = False
     rolling_search_route: bool = False
-    search_route_starts: int = 1
     # 承诺式补证游（默认关闭；开启时通常连同 absence_route_2opt）：把 2-opt
     # 改进后的完整路线缓存并按序执行，期间任何示向/近场读数（出现新发现）
     # 立即作废该路线。只改"估计与执行一致"，不改覆盖站点集合与证书。
@@ -213,8 +211,6 @@ class Problem3Config:
 
     def __post_init__(self):
         """在构造格网或执行动作之前拒绝不稳定的搜索参数。"""
-        if type(self.search_route_starts) is not int or not 1 <= self.search_route_starts <= 8:
-            raise ValueError('搜索路径初始化次数必须为1到8的整数。')
         for name in ('lattice_spacing_m', 'planning_spacing_m', 'candidate_spacing_m', 'candidate_radius_m'):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0:
@@ -577,11 +573,19 @@ class Problem3Strategy:
     def _lls_point(self, knowledge):
         """该频道全部示向线的最小二乘交会点；读数不足或退化时返回 None。
 
-        与问题四共用 SVD 退化检查；候选仍须通过调用方的掩码一致性护栏。
+        每条示向线写为 n·p = n·s（n 为示向方向法向量，s 为测站）。解不约束在
+        掩码内——近平行线的病态交会由调用方的掩码一致性距离拦截。
         """
         readings = [(obs.x, obs.y, obs.bearing_deg) for obs in knowledge.observations
                     if obs.result == 'direction' and obs.bearing_deg is not None]
-        return bearing_intersection(readings, self.config.lls_probe_min_reads)
+        if len(readings) < self.config.lls_probe_min_reads:
+            return None
+        normals = np.array([[-np.sin(np.deg2rad(t)), np.cos(np.deg2rad(t))]
+                            for _, _, t in readings])
+        stations = np.array([[x, y] for x, y, _ in readings], dtype=float)
+        rhs = np.einsum('ij,ij->i', normals, stations)
+        point, *_ = np.linalg.lstsq(normals, rhs, rcond=None)
+        return point
 
     def _lls_probe_option(self, channel, knowledge):
         """LLS 试探清除选项：以实际示向线交会点为清除赌注，与读数链条同台评分。
@@ -1087,8 +1091,7 @@ class Problem3Strategy:
         """返回 2-opt 改进后的访问顺序（不重算时间，只重排索引）。"""
         if self.config.rolling_search_route:
             order = open_route_order([point for point, _ in visit_sequence],
-                                     self.position, list(range(len(visit_sequence))),
-                                     starts=self.config.search_route_starts)
+                                     self.position, list(range(len(visit_sequence))))
             return [visit_sequence[index] for index in order]
         start = np.asarray(self.position, dtype=float)
         points = [np.asarray(waypoint, dtype=float) for waypoint, _ in visit_sequence]
