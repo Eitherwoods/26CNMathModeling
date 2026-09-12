@@ -1,1 +1,6 @@
-python -m codes.run_robot --mode practice --problem 3 --strategy codes.strategy_p3:solve --confirm-practice --log output/protocol/practice-p3-01.jsonl
+# 问题三演练命令（2026-09-13 起默认 V3 策略：24 种子官方同构 Engine 275.4 s/源，100% 清除；
+# 主线 MPC 315.7 s/源，保留为消融对照）
+python -m codes.run_robot --mode practice --problem 3 --strategy codes.strategy_p3v3:solve --confirm-practice --log output/protocol/practice-p3-01.jsonl
+
+# 消融对照（主线 MPC）：
+# python -m codes.run_robot --mode practice --problem 3 --strategy codes.strategy_p3:solve --confirm-practice --log output/protocol/practice-p3-mpc.jsonl

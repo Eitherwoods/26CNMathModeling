@@ -85,3 +85,7 @@ output/localsim/
 tester/reverse/*
 !tester/reverse/NOTES.md
 !tester/reverse/parse_pclntab.py
+
+# SQLite 运行时伴生文件（WAL/SHM，模拟器进程退出后残留，不入库）
+tester/JammersSimulatorData/*.sqlite3-shm
+tester/JammersSimulatorData/*.sqlite3-wal

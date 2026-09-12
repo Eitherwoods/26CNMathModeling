@@ -61,10 +61,10 @@ genRules PracticeGenRules(0x70), simRules SimulationRules(0x80))`。
    **directional**，其余 **omni**（P3 全部 omni，实测 result.json 一致）。
 4. 逐源（信道号 ch）：
    - 落点（拒绝采样，成对重抽直到合法）：
-     - `radius = 1770000000.0 · sqrt( (next("jammer/%d/radius") >> 11) · 2^-53 )`（um）
+     - `radius = 1800000000.0 · sqrt( (next("jammer/%d/radius") >> 11) · 2^-53 )`（um）（2026-09-13 修正：题目确认落点区域为 1800 m 目标圆域，早前 1770 系误读）
      - `theta  = (next("jammer/%d/theta") >> 11) · 2^-53 · 2π`
      - `x = round(cos·radius)`, `y = round(sin·radius)`（四舍五入远离零，um）
-     - 接受条件 `insideJammerDisk`：`|x|² + |y|² ≤ 1770000000²`（math/big 精确整数）
+     - 接受条件 `insideJammerDisk`：`|x|² + |y|² ≤ 1800000000²`（math/big 精确整数，题目目标区域 1800 m）
    - `max_receive = 1000000000 + uintN("jammer/%d/receive", 500000001)`（um，含两端
      → **[1000, 1500] m** 的均匀整数）
    - （仅 directional）`direction = uintN("jammer/%d/direction", 360000000)`（udeg，[0,360°)）
@@ -83,7 +83,7 @@ genRules PracticeGenRules(0x70), simRules SimulationRules(0x80))`。
 |---|---|---|
 | +0x00 | "practice-gen-rules-v1" | 版本串 |
 | +0x10 | 1 800 000 000 um = 1800 m | 用途未定位 |
-| +0x18 | 1 770 000 000 um = 1770 m | 落点圆盘半径（uniform_disk_area） |
+| +0x18 | 1 800 000 000 um = 1800 m | 落点圆盘半径（uniform_disk_area）；2026-09-13 修正为 1800 m（题目确认目标区域半径 1800 m，早前 1770 系误读） |
 | +0x20 | 30 000 000 um = 30 m | 用途未定位 |
 | +0x28 | 335 613 962 um ≈ 335.614 m | 用途未定位 |
 | +0x30 | 1 000 000 000 um = 1000 m | 接收半径下限（uniform_integer_um） |
