@@ -25,6 +25,11 @@ from .config import (ANGLE_ERROR_DEG, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
                      MIN_RECEIVE_RADIUS_M, NEAR_DISTANCE_M, TARGET_RADIUS_M)
 
 COVERING_RADIUS_FACTOR = float(np.sqrt(2.0) / 2.0)
+# 七点证书骨架的环半径：R·cos30° 使"环向中缝"的最坏漏检取最小值 R·sin30°。
+# 对 R=1800 即 1558.85 m 处最坏漏检 900 m ≤ 1000 m（有效接收半径下界），
+# 因此"该七点全无信号 ⇒ 频道不存在"成立。六圆覆盖半径的已知极限约
+# 1798.87 m < 1800 m，故 7 是完备证书的理论最少站数（修正 oracle §11 采用）。
+CERT_RING_RADIUS_M = float(900.0 * np.sqrt(3.0))
 
 
 @dataclass(frozen=True)

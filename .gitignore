@@ -75,3 +75,13 @@ logs/
 # 本地只保留正确性单元测试，离线自检/基准记录不再保留、不再入库
 output/protocol/offline-*
 output/protocol/test-*.jsonl
+
+tester/full_disasm.txt
+
+# 本地演练模拟器的场景文件（含干扰源真值，不入库）
+output/localsim/
+
+# 逆向分析原始产物（体积大且可用 reverse/parse_pclntab.py 再生成）
+tester/reverse/*
+!tester/reverse/NOTES.md
+!tester/reverse/parse_pclntab.py

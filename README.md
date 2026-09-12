@@ -13,7 +13,7 @@
 | `body/` | 论文 LaTeX 工程（`main.tex` + `cumcmthesis.cls`），编译产物 `main.pdf` |
 | `figures/` | 论文插图，按问题分目录，PNG 预览 + SVG 论文版（总索引见 [figures/README.md](figures/README.md)） |
 | `output/` | 运行结果：演练协议日志进 `output/protocol/`，在线演练任务记录进 `output/Problem3\|4/`（约定见 [output/README.md](output/README.md)） |
-| `tester/` | 官方模拟器 `jammers-simulator.exe`、演练命令（`runq3.txt`/`runq4.txt`）、演练自动化说明、模拟器数据 |
+| `tester/` | 官方模拟器 `jammers-simulator.exe`、演练命令（`runq3.txt`/`runq4.txt`）、演练自动化说明、模拟器数据；本地训练见 [tester/READMElocal.md](tester/READMElocal.md) |
 
 ## 环境要求
 

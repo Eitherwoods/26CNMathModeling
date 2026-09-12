@@ -32,10 +32,11 @@ from . import config as settings
 from .base_models import bearing_deg, open_route_order, adaptive_directions, bounded_candidates
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
-                     MAX_SOURCE_COUNT, MIN_SOURCE_COUNT,
-                     MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M, ROBOT_SPEED_MPS,
+                     MAX_SOURCE_COUNT, MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M,
+                     OPTICAL_TIME_S, ROBOT_SPEED_MPS,
                      TARGET_RADIUS_M)
-from .problem3_model import ChannelKnowledge, Lattice, apply_direction, hex_waypoints
+from .problem3_model import (CERT_RING_RADIUS_M, ChannelKnowledge, Lattice,
+                             apply_direction, hex_waypoints)
 from .strategy import BudgetReached
 
 TARGET_AREA_M2 = float(np.pi * TARGET_RADIUS_M ** 2)
@@ -122,6 +123,44 @@ class Problem3Config:
     # GDOP 更优的第二站几何。见 solutions/problem3_flow.md §10.2。
     rendezvous_chase: bool = False
     rendezvous_offsets_m: tuple = (600.0, 900.0, 1200.0)
+    # LLS 试探清除（2026-09-12 新增，默认开启）。动机：示向读数的保证误差界是
+    # ±1°，但官方误差场的**实际残差**远小于该界——2026-09-12 演练 105 条读数
+    # 实测（以最终清除点为参照）：示向残差中位数 0.42°；把每频道全部实际示向线
+    # 做最小二乘交会（LLS），交会点与真值中位误差 4.3 m，16/16 全部落在 20 m
+    # 清除半径内。保守掩码必须按 ±1° 锥收缩，收敛链因此呈"步长折半"的爬行
+    # 形态（单源 5-7 次读数 + 约 1.5 km 行进）。本机制在取得
+    # `lls_probe_min_reads` 条示向读数后，把 LLS 交会点作为**清除试探**候选与
+    # 读数链条同台评分：命中即省去链尾的多次读数与爬行行进；失败仅 3 s，且
+    # "目标不在 B(试探点,20 m) 内"是严格成立的排除（与任何误差模型一致，
+    # 不产生错误结论）。三重护栏防止病态下注：掩码一致性距离、目标域界、
+    # 与历史清除尝试点的最小间距（失败后不再向同一点重复下注）。
+    lls_probe: bool = True
+    lls_probe_min_reads: int = 2
+    lls_probe_max_mask_dist_m: float = 200.0
+    lls_probe_min_separation_m: float = 25.0
+    # 失败分支的期望返工成本（秒）：试探失败后机器人已站在交会点，掩码已排除
+    # B(试探点,20 m)，下一动作通常是一次近距读数（6 s）+ 剩余逼近与收尾
+    # （与 _clear_expectation_s 的 remaining/5 + endgame 同尺度）。取 120 s
+    # 表示"1 次读数 + 中等剩余距离 + 收尾"，与追击选项评分可比。
+    lls_probe_failure_cost_s: float = 120.0
+    # 速通收尾（2026-09-12 第五轮新增，默认关闭）。语义：不再坚持"全部频道
+    # 证明不存在/已清除"的收尾标准——已清除数达到 `sprint_min_clears`（题面
+    # 下界 10）且没有已发现待追踪频道时，放弃纯证书类收尾动作（路线前瞻
+    # 兜底/承诺补证游），直接以 'sprint_stop' 结束。这是"清除比例 vs 平均
+    # 定位清除时间"的显式权衡：演练实测证书尾巴占全期 17%—34%；放弃它
+    # 平均时间显著下降，但若仍有未检测到的真实源，清除比例会受损。
+    # 追击与 LLS 试探（真实源）不受影响——已发现频道永远清完再谈收尾。
+    sprint_stop: bool = False
+    sprint_min_clears: int = 10
+    # 证书骨架（2026-09-12 第六轮，**证伪，默认关闭**）：把七点环
+    # hex@1558.85 m（最坏漏检 900 m ≤ 1000 m，完备证书理论最少站数）并入
+    # 候选池，动机是修正 oracle 的"7 站证书顺路嵌入源巡回"。演练 4 局实测
+    # **+27%**（371.7/351.6/373.7/480.0 vs 同口径 9 局 310.5）：骨架站几乎
+    # 不被中段选用（0—6 站/局），尾巴没有缩短（223—1676 s），反而 +6 个
+    # 候选扭曲了搜索评分的全局排序，行进普涨（n14 +5.5 km）。结论与 §8/§9
+    # 一致：顺路嵌入的收益需要巡回级调度，逐轮贪心 MPC 无法表达，加候选
+    # 只会放大评分噪声。保留开关供论文消融表引用。
+    certificate_ring: bool = False
     # 折返抑制（默认关闭，单位秒）：候选停靠点的方位与"上一段实际移动方位"夹角超过
     # `turn_penalty_angle_deg` 时，在其评分上加惩罚。动机：MPC 每轮贪心选点会在两个
     # 方向相反的目标之间来回切换——n12 案例实测出现 500 m 去 + 500 m 回的 A→B→A
@@ -188,6 +227,28 @@ class Problem3Config:
         if (not isinstance(offsets, (tuple, list)) or not offsets
                 or any(isinstance(v, bool) or not np.isfinite(v) or v <= 0 for v in offsets)):
             raise ValueError('双站交会偏距必须为非空的有限正数序列。')
+        if not isinstance(self.lls_probe, bool):
+            raise ValueError('lls_probe 必须为布尔值。')
+        if (isinstance(self.lls_probe_min_reads, bool)
+                or not isinstance(self.lls_probe_min_reads, int)
+                or self.lls_probe_min_reads < 2):
+            raise ValueError('lls_probe_min_reads 必须为不小于 2 的整数。')
+        if not np.isfinite(self.lls_probe_max_mask_dist_m) or self.lls_probe_max_mask_dist_m < 0:
+            raise ValueError('lls_probe_max_mask_dist_m 必须为非负有限数。')
+        if (not np.isfinite(self.lls_probe_min_separation_m)
+                or self.lls_probe_min_separation_m < CLEAR_RADIUS_M):
+            raise ValueError('lls_probe_min_separation_m 不得小于清除半径。')
+        if (not np.isfinite(self.lls_probe_failure_cost_s)
+                or self.lls_probe_failure_cost_s < 0.0):
+            raise ValueError('lls_probe_failure_cost_s 必须为非负有限数。')
+        if not isinstance(self.sprint_stop, bool):
+            raise ValueError('sprint_stop 必须为布尔值。')
+        if (isinstance(self.sprint_min_clears, bool)
+                or not isinstance(self.sprint_min_clears, int)
+                or not 1 <= self.sprint_min_clears <= MAX_SOURCE_COUNT):
+            raise ValueError('sprint_min_clears 必须为 1..16 的整数。')
+        if not isinstance(self.certificate_ring, bool):
+            raise ValueError('certificate_ring 必须为布尔值。')
         if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
             raise ValueError('追踪路径限制必须非负且有限。')
         if not self.lookahead_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.lookahead_lengths_m):
@@ -268,20 +329,30 @@ class Problem3Strategy:
         """构造具有覆盖证明的搜索候选停靠点。
 
         默认使用九点方格方案；混合十五点与七点六边形方案保留用于消融测试。
+        `certificate_ring` 开启时并入七点证书骨架（hex@1558.85 m，最坏漏检
+        900 m），使搜索/收尾路线可以在中段顺路积累无信号覆盖证书。
         """
         if self.config.candidate_layout == 'hex7':
-            return hex_waypoints(self.config.candidate_radius_m)
-        if self.config.candidate_layout not in ('grid9', 'hybrid15'):
-            raise ValueError(f'未知候选布局: {self.config.candidate_layout}')
-        lattice = Lattice.build(self.config.candidate_spacing_m,
-                                self.config.candidate_radius_m)
-        points = lattice.points
-        inside = np.hypot(points[:, 0], points[:, 1]) <= TARGET_RADIUS_M + 1e-9
-        grid9 = points[inside]
-        if self.config.candidate_layout == 'grid9':
-            return grid9
-        hex7 = hex_waypoints(self.config.candidate_radius_m)
-        return np.unique(np.round(np.vstack((grid9, hex7)), decimals=9), axis=0)
+            candidates = hex_waypoints(self.config.candidate_radius_m)
+        else:
+            if self.config.candidate_layout not in ('grid9', 'hybrid15'):
+                raise ValueError(f'未知候选布局: {self.config.candidate_layout}')
+            lattice = Lattice.build(self.config.candidate_spacing_m,
+                                    self.config.candidate_radius_m)
+            points = lattice.points
+            inside = np.hypot(points[:, 0], points[:, 1]) <= TARGET_RADIUS_M + 1e-9
+            grid9 = points[inside]
+            if self.config.candidate_layout == 'grid9':
+                candidates = grid9
+            else:
+                hex7 = hex_waypoints(self.config.candidate_radius_m)
+                candidates = np.unique(np.round(np.vstack((grid9, hex7)),
+                                                decimals=9), axis=0)
+        if self.config.certificate_ring:
+            skeleton = hex_waypoints(CERT_RING_RADIUS_M)
+            candidates = np.unique(np.round(np.vstack((candidates, skeleton)),
+                                            decimals=9), axis=0)
+        return candidates
 
     # ------------------------------------------------------------- 工具方法
 
@@ -438,6 +509,13 @@ class Problem3Strategy:
             score = self._clear_expectation_s(channel, waypoint, measures)
             options.append(StopPlan('chase', waypoint, measures, self._travel_m(waypoint),
                                     score_s=score, note=note, target_channel=channel))
+        if self.config.lls_probe:
+            # LLS 试探清除不占 chase_options_limit 短名单：生成成本可忽略，
+            # 且其价值（跳过收敛链尾）恰恰集中在短名单排不进前四的频道上。
+            for channel in self._detected_channels():
+                option = self._lls_probe_option(channel, self.channels[channel])
+                if option is not None:
+                    options.append(option)
         return options
 
     @staticmethod
@@ -481,6 +559,76 @@ class Problem3Strategy:
                     note=f'频道{channel}双站交会{sign * offset_m:+.0f}m',
                     target_channel=channel))
         return options
+
+    @staticmethod
+    def _lls_probe_confidence(reads):
+        """LLS 交会点一次清除命中的经验置信度。
+
+        依据 2026-09-12 演练实测（见 `lls_probe` 配置注释）：2 线约 0.62、
+        3 线约 0.75、全部线 1.00，线性拟合后再封顶，只用于选项评分排序，
+        不参与任何严格结论。
+        """
+        return min(0.95, 0.30 + 0.15 * int(reads))
+
+    def _lls_point(self, knowledge):
+        """该频道全部示向线的最小二乘交会点；读数不足或退化时返回 None。
+
+        每条示向线写为 n·p = n·s（n 为示向方向法向量，s 为测站）。解不约束在
+        掩码内——近平行线的病态交会由调用方的掩码一致性距离拦截。
+        """
+        readings = [(obs.x, obs.y, obs.bearing_deg) for obs in knowledge.observations
+                    if obs.result == 'direction' and obs.bearing_deg is not None]
+        if len(readings) < self.config.lls_probe_min_reads:
+            return None
+        normals = np.array([[-np.sin(np.deg2rad(t)), np.cos(np.deg2rad(t))]
+                            for _, _, t in readings])
+        stations = np.array([[x, y] for x, y, _ in readings], dtype=float)
+        rhs = np.einsum('ij,ij->i', normals, stations)
+        point, *_ = np.linalg.lstsq(normals, rhs, rcond=None)
+        return point
+
+    def _lls_probe_option(self, channel, knowledge):
+        """LLS 试探清除选项：以实际示向线交会点为清除赌注，与读数链条同台评分。
+
+        成功即完成该频道的定位清除（省去 ±1° 最坏情形收敛链的链尾）；
+        失败只损失一次清除动作（3 s），且由 `observe_clear_failure` 向掩码
+        提供 B(试探点, 20 m) 的严格排除。选项评分为"行进 + 清除动作 +
+        失败分支的期望返工"，置信度只影响排序。
+        """
+        if knowledge.status != 'detected':
+            return None
+        point = self._lls_point(knowledge)
+        if point is None:
+            return None
+        read_count = sum(1 for obs in knowledge.observations
+                         if obs.result == 'direction' and obs.bearing_deg is not None)
+        px, py = float(point[0]), float(point[1])
+        # 护栏一：与该频道历史清除尝试点保持间距——失败试探已经排除
+        # B(该点,20 m)，向同一点重复下注只会反复空耗。
+        if any(np.hypot(px - cx, py - cy) < self.config.lls_probe_min_separation_m
+               for cx, cy in knowledge.clear_positions):
+            return None
+        # 护栏二：交会点不得飞出目标域附近（最小二乘对病态几何不设防）。
+        if float(np.hypot(px, py)) > TARGET_RADIUS_M + 250.0:
+            return None
+        # 护栏三：交会点必须与保守掩码大体一致。掩码是 ±1° 保证界下的
+        # 严格可能集合，交会点落在掩码 200 m 以外说明读数几何退化。
+        mask_points = self.fine.points[knowledge.mask]
+        if not len(mask_points):
+            return None
+        if len(mask_points) > 4000:
+            mask_points = mask_points[::int(np.ceil(len(mask_points) / 4000))]
+        mask_distance = float(np.min(np.linalg.norm(mask_points - point[None, :], axis=1)))
+        if mask_distance > self.config.lls_probe_max_mask_dist_m:
+            return None
+        confidence = self._lls_probe_confidence(read_count)
+        travel_m = float(np.hypot(px - self.position[0], py - self.position[1]))
+        score = (travel_m / ROBOT_SPEED_MPS + OPTICAL_TIME_S + CLEAR_TIME_S
+                 + (1.0 - confidence) * self.config.lls_probe_failure_cost_s)
+        return StopPlan(
+            'lls_probe', np.array([px, py]), [], travel_m, score_s=score,
+            note=f'频道{channel}LLS交会试探（{read_count}线，命中{confidence:.2f}）',
+            target_channel=channel)
 
     def _tracking_remaining_s(self, upper_m):
         """估计从安全距离上界 U 出发完成保证性追踪所需的保守虚拟时间。"""
@@ -1364,9 +1512,29 @@ class Problem3Strategy:
             return due_tracking[0]
         options.sort(key=lambda plan: plan.score_s)
         best = options[0]
+        if self._sprint_should_stop(best):
+            self.stop_reason = 'sprint_stop'
+            return None
         # 若最优计划需要长距离移动，检查直线路径上是否有高价值中间停靠点。
         intermediate = self._maybe_intermediate_plan(best)
         return intermediate if intermediate is not None else best
+
+    def _sprint_should_stop(self, best):
+        """速通收尾判定：放弃纯证书类动作，按较弱的收尾标准提前结束。
+
+        触发条件（全部满足）：sprint_stop 开启、已清除数达到 sprint_min_clears、
+        没有已发现待追踪频道、且最优计划是纯证书类动作（路线前瞻兜底/
+        承诺补证游——它们的存在意义就是凑齐"不存在"覆盖证据）。此时返回
+        True 由 `_decide` 交还主循环，主循环以 'sprint_stop' 正常收尾。
+        普通搜索（sweep/backstop）携带真实发现期望，不在此列。
+        """
+        if not self.config.sprint_stop:
+            return False
+        if len(self.cleared) < self.config.sprint_min_clears:
+            return False
+        if self._detected_channels():
+            return False
+        return best.kind in ('route_backstop', 'tour_station')
 
     def _apply_turn_penalty(self, options):
         """折返抑制：给与上一段移动方向相反的长距离选项加评分惩罚。
@@ -1521,10 +1689,16 @@ class Problem3Strategy:
         self._record(channel, 'measure', result, response)
         self._sample_channel(channel)
 
-    def _execute_clears(self, waypoint):
+    def _execute_clears(self, waypoint, forced_channel=None):
         acted = False
         x, y = float(waypoint[0]), float(waypoint[1])
-        for channel in self._clear_candidates(waypoint):
+        candidates = self._clear_candidates(waypoint)
+        if (forced_channel is not None and forced_channel not in candidates
+                and self.channels[forced_channel].is_active):
+            # LLS 试探清除是显式下注：掩码判据尚未收敛也照样尝试，
+            # 失败分支由 observe_clear_failure 严格排除 B(该点,20 m)。
+            candidates.append(forced_channel)
+        for channel in candidates:
             if self.context.should_stop():
                 break
             self._check_action_budget(waypoint, 'clear', channel)
@@ -1596,7 +1770,10 @@ class Problem3Strategy:
 
     def _sample_channel(self, channel):
         knowledge = self.channels[channel]
-        limit = knowledge.max_distance_m(*self.position)
+        # 矛盾状态（已发现但掩码清空）下 max_distance_m 无定义；
+        # 读数异常绝不能炸掉主循环，此处记 None 并交由结束判定上报。
+        limit = (None if not knowledge.mask.any()
+                 else knowledge.max_distance_m(*self.position))
         self.channel_series[channel].append(
             {'measure_count': len(knowledge.observations),
              'limit_m': None if limit is None else float(limit),
@@ -1688,6 +1865,9 @@ class Problem3Strategy:
                     self.tracking_wait_rounds[channel] += 1
             try:
                 plan = self._decide()
+                if plan is None and self.stop_reason == 'sprint_stop':
+                    # 速通收尾：主动放弃证书类动作，不能再被自救计划覆盖。
+                    break
                 if plan is None:
                     # 自救：规划层给出"无动作"不等于任务该结束。若仍有活跃频道，
                     # 用覆盖兜底再试一次（放宽阈值以允许为零星残差跑一趟）；
@@ -1698,7 +1878,8 @@ class Problem3Strategy:
                                         'no_action')
                     break
                 acted = self._execute_measures(plan)
-                acted = self._execute_clears(plan.waypoint) or acted
+                forced = plan.target_channel if plan.kind == 'lls_probe' else None
+                acted = self._execute_clears(plan.waypoint, forced_channel=forced) or acted
             except BudgetReached:
                 self.stop_reason = 'exit_margin'
                 break
@@ -1775,9 +1956,9 @@ def is_offline_run(context):
     return isinstance(getattr(context.client, 'transport', None), OfflineStub)
 
 
-def solve(context):
+def solve(context, config=None):
     """供运行器加载的算法入口，并按在线/离线类型分别保存任务记录。"""
-    record = run_mission(context)
+    record = run_mission(context, config)
     summary = summarize(record)
     offline = is_offline_run(context)
     try:

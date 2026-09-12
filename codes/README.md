@@ -39,6 +39,8 @@ python -m unittest codes.test_problem2 -v
 - `problem3_model.py`：问题三可能位置集合的栅格表示、保守更新算子、单频道判据与覆盖布站。
 - `problem3_solution.py`：问题三五项决策策略、统计汇总与离线命令行入口。
 - `strategy_p3.py`：问题三运行器入口适配（导出 `solve`）。
+- `strategy_p3s.py`：问题三速通收尾口径入口（`sprint_stop=True`，清除比例与
+  平均时间的显式权衡消融项；保守口径仍以 `strategy_p3` 为准）。
 - `scenario.py`：离线演练案例生成（随机/固定），不是官方案例分布。
 - `problem3_plotting.py`：问题三任务图（轨迹、可能区域收敛、动作时间构成）。
 - `test_problem3.py`：问题三栅格、覆盖式不存在性证明、清除判据与离线端到端测试。
@@ -265,6 +267,31 @@ HTTP传输需显式构造 `HttpTransport(base_url, allow_network=True)` 并传�
 不是正式模式保护或演练模式证明。接入官方模拟器前须由用户核实界面处于演练，
 任何正式测试均不在本次工作范围。禁止因为连接失败自动启动或切换测试模块。
 网络层禁用环境代理与重定向，只接受明确的回环HTTP地址和端口。
+
+## 本地演练模拟器（官方算法复刻，2026-09-12 新增）
+
+`codes/local_simulator.py` 是对官方 `jammers-simulator.exe` 演练模式的**逆向复刻**：
+随机数（HMAC-SHA256 计数器源）、场景生成分布（源数 10..16、信道洗牌、1770 m 圆盘落点、
+接收半径 1000..1500 m）、空间示向度噪声（BLAKE2b-64 值噪声 + smoothstep 插值 + ±1° 限幅 +
+1/100 度量化）、动作判定与虚拟时间计费（5 m/s 移动、measure 5 s+换信道 1 s、clear 5 s/3 s、
+near ≤5 m、20 m 清除半径）均按反编译结果实现，时序模型已用真实演练日志 248 条转移逐条验证。
+
+```powershell
+# 终端 1：启动本地模拟器（默认端口 2026 被官方模拟器占用时换 2027 等）
+python -X utf8 -m codes.local_simulator --problem 3 --port 2027
+# 可选：--key-hex <64位hex> 固定种子复现同一场景；--scenario-out 指定场景保存路径
+
+# 终端 2：与服务器演练完全相同的命令，只多一个 --base-url
+python -X utf8 -m codes.run_robot --mode practice --problem 3   --strategy codes.strategy_p3:solve --confirm-practice   --base-url http://127.0.0.1:2027 --log output/protocol/localsim-p3-01.jsonl
+```
+
+- 场景 JSON（含干扰源真值与 64 位生成器密钥）落在 `output/localsim/`（已 gitignore），
+  用 `--scenario-in` 可重放同一布局对比策略改动。
+- 正确性测试：`python -m unittest codes.test_local_simulator -v`。
+  完整使用说明（固定场景复现、批量扫档、与官方差异）见 [tester/READMElocal.md](../tester/READMElocal.md)。
+- 边界说明：官方与 CPython 的三角函数存在 ≤1 ulp 差异，个别示向度可能差 0.01°；
+  认证/加密日志/上传队列不复刻（本地演练本就不需要）。**论文与正式成绩仍以服务器演练为准**，
+  本地模拟器用于无服务器环境下的策略迭代与批量自测。
 
 ## 离线桩边界
 

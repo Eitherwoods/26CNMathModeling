@@ -18,10 +18,10 @@ from .config import (CHANNEL_COUNT, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
                      MIN_RECEIVE_RADIUS_M, MIN_SOURCE_COUNT, NEAR_DISTANCE_M,
                      ROBOT_SPEED_MPS, TARGET_RADIUS_M)
 from .offline_stub import OfflineStub, Source
-from .problem3_model import (ChannelKnowledge, Lattice, apply_direction,
-                             apply_distance_order, apply_near, apply_outside, apply_wedge,
-                             coverage_radius_m, hex_waypoints,
-                             sweep_waypoint_gain, wedge_distance)
+from .problem3_model import (CERT_RING_RADIUS_M, ChannelKnowledge, Lattice,
+                             apply_direction, apply_distance_order, apply_near,
+                             apply_outside, apply_wedge, coverage_radius_m,
+                             hex_waypoints, sweep_waypoint_gain, wedge_distance)
 from .problem3_solution import (Problem3Config, Problem3Strategy, StopPlan,
                                 is_offline_run, run_mission, solve, summarize)
 from .protocol import RobotClient, decode, encode
@@ -570,11 +570,24 @@ class CoverageCertificateTests(unittest.TestCase):
     def test_candidates_exclude_out_of_region_points(self):
         """候选集必须剔除落在目标圆域外的格点（曾混入 4 个半径 2400 的点）。
 
-        默认 hybrid15 = 九点方格 ∪ 七点六边形去重，共 15 个候选。
+        默认（certificate_ring 证伪关闭）hybrid15 = 15 个候选；开启时并入
+        证书骨架（hex@1558.85 m）共 21 个（中心重合）。
         """
         radii = np.hypot(self.strategy.candidates[:, 0], self.strategy.candidates[:, 1])
         self.assertLessEqual(radii.max(), TARGET_RADIUS_M + 1e-9)
         self.assertEqual(len(self.strategy.candidates), 15)
+        ringed = Problem3Strategy(_DummyContext(),
+                                  Problem3Config(certificate_ring=True))
+        self.assertEqual(len(ringed.candidates), 21)
+
+    def test_certificate_ring_completes_coverage_on_its_own(self):
+        """七点证书骨架自身必须构成完备无信号证书（最坏漏检 ≤ 1000 m）。"""
+        skeleton = hex_waypoints(CERT_RING_RADIUS_M)
+        worst = coverage_radius_m(
+            np.column_stack((TARGET_RADIUS_M * np.cos(np.linspace(0, 2 * np.pi, 1441)),
+                             TARGET_RADIUS_M * np.sin(np.linspace(0, 2 * np.pi, 1441)))),
+            skeleton)
+        self.assertLessEqual(worst, MIN_RECEIVE_RADIUS_M)
 
     def test_certificate_rejects_insufficient_coverage(self):
         """只测一个点就判"不存在"时，证书必须拒绝认证。"""
@@ -935,6 +948,209 @@ class RendezvousChaseTests(unittest.TestCase):
                 Problem3Config(rendezvous_offsets_m=offsets)
 
 
+class _ClearRecordingContext(_DummyContext):
+    """额外提供 clear() 记录的测试替身，用于 LLS 试探的执行路径。"""
+
+    def __init__(self):
+        super().__init__()
+        self.clear_calls = []
+
+    def clear(self, x, y, channel):
+        self.clear_calls.append((float(x), float(y), int(channel)))
+        return {'clear_result': 'no_target_in_range', 'virtual_time_s': 10.0}
+
+
+class LlsProbeTests(unittest.TestCase):
+    """LLS 试探清除：门控、生成、三重护栏与强制执行路径。
+
+    场景几何：真值约 (900, 0)，测站 1 在原点（示向 0.5°），测站 2 在
+    (600, 300)（示向 −45.5°）。两读数都与真值相容（掩码非空），
+    最小二乘交会点约 (887, 7.7)。
+    """
+
+    def setUp(self):
+        """构造停在原点的最小策略并注入两条相容示向读数。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+        self.strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.5, 'virtual_time_s': 5.0})
+        self.strategy._move_to(np.array([600.0, 300.0]))
+        self.strategy._apply_measure(
+            1, np.array([600.0, 300.0]),
+            {'measure_result': 'direction', 'svd_deg': -45.5, 'virtual_time_s': 11.0})
+        self.strategy._move_to(np.array([0.0, 0.0]))
+
+    def _lls_options(self):
+        return [plan for plan in self.strategy._chase_options()
+                if plan.kind == 'lls_probe']
+
+    def test_default_generates_single_option_per_channel(self):
+        """默认开启：两线交会后必须生成且只生成一个 LLS 试探选项。"""
+        options = self._lls_options()
+        self.assertEqual(len(options), 1)
+        plan = options[0]
+        self.assertEqual(plan.target_channel, 1)
+        self.assertEqual(plan.measures, [])
+        self.assertAlmostEqual(float(plan.waypoint[0]), 887.0, delta=3.0)
+        self.assertAlmostEqual(float(plan.waypoint[1]), 7.7, delta=3.0)
+        self.assertTrue(np.isfinite(plan.score_s))
+
+    def test_disabled_by_default_flag_generates_nothing(self):
+        """门控关闭（lls_probe=False）时不生成 LLS 选项。"""
+        self.strategy.config = Problem3Config(lls_probe=False)
+        self.assertEqual(self._lls_options(), [])
+
+    def test_min_reads_gate(self):
+        """lls_probe_min_reads=3 时两条读数不足以生成试探。"""
+        self.strategy.config = Problem3Config(lls_probe_min_reads=3)
+        self.assertEqual(self._lls_options(), [])
+        self.strategy._move_to(np.array([300.0, 900.0]))
+        self.strategy._apply_measure(
+            1, np.array([300.0, 900.0]),
+            {'measure_result': 'direction', 'svd_deg': -56.6, 'virtual_time_s': 20.0})
+        self.assertEqual(len(self._lls_options()), 1)
+
+    def test_inconsistent_readings_generate_nothing(self):
+        """读数互相矛盾（掩码为空）时不得下注——矛盾状态需上报而非试探。"""
+        probe = self.strategy.channels[2]
+        probe.observe_direction(600.0, 300.0, 45.0)
+        probe.observe_direction(0.0, 0.0, 0.0)
+        self.assertTrue(probe.is_inconsistent)
+        self.assertIsNone(self.strategy._lls_probe_option(2, probe))
+
+    def test_far_flying_intersection_rejected(self):
+        """交会点飞出目标域附近时拒绝下注（病态几何护栏）。"""
+        with mock.patch.object(Problem3Strategy, '_lls_point',
+                               return_value=np.array([5000.0, 0.0])):
+            self.assertEqual(self._lls_options(), [])
+
+    def test_mask_inconsistent_point_rejected(self):
+        """交会点距保守掩码过远时拒绝下注。"""
+        with mock.patch.object(Problem3Strategy, '_lls_point',
+                               return_value=np.array([100.0, 100.0])):
+            self.assertEqual(self._lls_options(), [])
+
+    def test_failed_probe_blocks_same_point_retry(self):
+        """失败试探必须阻断向同一点的重复下注（间距护栏）。"""
+        point = self._lls_options()[0].waypoint
+        self.strategy.channels[1].observe_clear_failure(
+            float(point[0]), float(point[1]), 20.0)
+        self.assertEqual(self._lls_options(), [])
+
+    def test_forced_clear_executes_and_records_failure(self):
+        """执行路径：lls_probe 计划强制对目标频道清除，失败被严格排除。"""
+        context = _ClearRecordingContext()
+        strategy = Problem3Strategy(context)
+        strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.5, 'virtual_time_s': 5.0})
+        waypoint = np.array([887.0, 7.7])
+        acted = strategy._execute_clears(waypoint, forced_channel=1)
+        self.assertTrue(acted)
+        self.assertEqual(context.clear_calls, [(887.0, 7.7, 1)])
+        self.assertIn((887.0, 7.7), strategy.channels[1].clear_positions)
+        self.assertTrue(strategy.channels[1].is_active)
+
+    def test_forced_clear_skips_already_cleared_channel(self):
+        """目标频道已清除时不得重复清除。"""
+        context = _ClearRecordingContext()
+        strategy = Problem3Strategy(context)
+        strategy._apply_measure(
+            1, np.array([887.0, 7.7]),
+            {'measure_result': 'direction', 'svd_deg': 0.5, 'virtual_time_s': 5.0})
+        strategy._apply_clear(1, np.array([887.0, 7.7]),
+                              {'clear_result': 'success', 'virtual_time_s': 10.0})
+        acted = strategy._execute_clears(np.array([887.0, 7.7]), forced_channel=1)
+        self.assertFalse(acted)
+        self.assertEqual(context.clear_calls, [])
+
+    def test_invalid_config_rejected(self):
+        """读数下限不足 2、间距小于清除半径、非法掩码距离必须在构造期拒绝。"""
+        with self.assertRaises(ValueError):
+            Problem3Config(lls_probe_min_reads=1)
+        with self.assertRaises(ValueError):
+            Problem3Config(lls_probe_min_separation_m=10.0)
+        with self.assertRaises(ValueError):
+            Problem3Config(lls_probe_max_mask_dist_m=-1.0)
+        with self.assertRaises(ValueError):
+            Problem3Config(lls_probe='yes')
+
+    def test_lls_point_matches_analytic_intersection(self):
+        """最小二乘交会点与两条示向线的解析交点一致。"""
+        point = self.strategy._lls_point(self.strategy.channels[1])
+        line1_y = np.tan(np.deg2rad(0.5)) * point[0]
+        line2_y = 300.0 + np.tan(np.deg2rad(-45.5)) * (point[0] - 600.0)
+        self.assertAlmostEqual(float(point[1]), float(line1_y), places=6)
+        self.assertAlmostEqual(float(line1_y), float(line2_y), places=3)
+
+
+class SprintStopTests(unittest.TestCase):
+    """速通收尾：默认关闭；开启后放弃纯证书类动作并以 sprint_stop 结束。"""
+
+    def setUp(self):
+        """构造不连接模拟器的最小问题三策略。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def _expensive_route_backstop(self):
+        return StopPlan('route_backstop', np.array([1000.0, 0.0]), [5],
+                        score_s=900.0)
+
+    def test_disabled_by_default_keeps_certificate_actions(self):
+        """默认关闭：证书类动作照常执行，行为与历史版本一致。"""
+        self.strategy.config = Problem3Config(intermediate_stop_gap_m=0.0)
+        self.strategy.cleared = set(range(1, 11))
+        self.strategy._chase_options = lambda: []
+        expensive = self._expensive_route_backstop()
+        self.strategy._search_plan = lambda: expensive
+        self.assertIs(self.strategy._decide(), expensive)
+        self.assertEqual(self.strategy.stop_reason, 'running')
+
+    def test_enabled_stops_on_certificate_action(self):
+        """开启且达到下界：证书类动作被放弃，返回 None 并标记 sprint_stop。"""
+        self.strategy.config = Problem3Config(sprint_stop=True,
+                                              intermediate_stop_gap_m=0.0)
+        self.strategy.cleared = set(range(1, 11))
+        self.strategy._chase_options = lambda: []
+        self.strategy._search_plan = lambda: self._expensive_route_backstop()
+        self.assertIsNone(self.strategy._decide())
+        self.assertEqual(self.strategy.stop_reason, 'sprint_stop')
+
+    def test_enabled_waits_for_min_clears(self):
+        """清除数未达下界时不放弃证书动作（比例保护）。"""
+        self.strategy.config = Problem3Config(sprint_stop=True,
+                                              sprint_min_clears=10,
+                                              intermediate_stop_gap_m=0.0)
+        self.strategy.cleared = {1, 2, 3}
+        self.strategy._chase_options = lambda: []
+        expensive = self._expensive_route_backstop()
+        self.strategy._search_plan = lambda: expensive
+        self.assertIs(self.strategy._decide(), expensive)
+
+    def test_detected_channel_blocks_sprint(self):
+        """仍有已发现待追踪频道时不收尾——真实源永远优先于速通。"""
+        self.strategy.config = Problem3Config(sprint_stop=True,
+                                              intermediate_stop_gap_m=0.0)
+        self.strategy.cleared = set(range(1, 11))
+        self.strategy._apply_measure(
+            1, np.array([0.0, 0.0]),
+            {'measure_result': 'direction', 'svd_deg': 0.5, 'virtual_time_s': 5.0})
+        self.strategy._chase_options = lambda: []
+        expensive = self._expensive_route_backstop()
+        self.strategy._search_plan = lambda: expensive
+        self.assertIs(self.strategy._decide(), expensive)
+
+    def test_invalid_config_rejected(self):
+        """sprint_min_clears 越界或类型非法必须在构造期拒绝。"""
+        with self.assertRaises(ValueError):
+            Problem3Config(sprint_min_clears=0)
+        with self.assertRaises(ValueError):
+            Problem3Config(sprint_min_clears=17)
+        with self.assertRaises(ValueError):
+            Problem3Config(sprint_min_clears=True)
+        with self.assertRaises(ValueError):
+            Problem3Config(sprint_stop='yes')
+
+
 class OfflineEndToEndTests(unittest.TestCase):
     """离线端到端：固定案例必须全部清除；轮次与停滞保护必须生效。"""
 
@@ -986,6 +1202,26 @@ class OfflineEndToEndTests(unittest.TestCase):
         self.assertEqual(record['inconsistent_channels'], [])
         results = [step['result'] for step in record['steps'] if step['channel'] == 5]
         self.assertIn('near', results)
+
+    def test_sprint_stop_ends_after_last_clear_without_certificate(self):
+        """速通口径：清完已发现源后放弃证书环游，以 sprint_stop 正常收尾。
+
+        固定案例 3 个源全部在首发探测中被发现，因此清除数必为 3；
+        sprint_min_clears 与 route_endgame_min_clears 同置 2，保证"清完即停"
+        路径（而不是先跑完无信号覆盖）被走到。
+        """
+        scenario = fixed_scenario([(1, 900.0, 0.0), (2, -700.0, 600.0),
+                                   (3, 300.0, -1000.0)])
+        config = Problem3Config(sprint_stop=True, sprint_min_clears=2,
+                                route_endgame_min_clears=2)
+        stub = OfflineStub(sources=scenario.sources)
+        client = RobotClient('offline-team', stub)
+        result = run_strategy(client, lambda context: run_mission(context, config), problem=3)
+        record = result['algorithm_result']
+        self.assertEqual(sorted(record['cleared_channels']), [1, 2, 3])
+        self.assertEqual(record['stop_reason'], 'sprint_stop')
+        self.assertEqual(record['planner_errors'], 0)
+        self.assertEqual(record['inconsistent_channels'], [])
 
     def test_record_is_json_serializable_and_complete(self):
         """任务记录必须可序列化，且包含轨迹、频道序列与配置快照。"""
