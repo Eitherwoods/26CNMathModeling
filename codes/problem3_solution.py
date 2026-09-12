@@ -6,8 +6,9 @@
 决策1+2 往哪走、走多远：在"追某个已发现目标"与"去某个覆盖增益更大的停靠点"
         两类选项之间，以**每清除一个干扰源的期望耗时**为统一尺度择优。
 决策3   是否扫描某频率：逐频道做状态筛选、重复检测筛选、新增约束判断与成本判断。
-决策4   是否清除某频率：以第三项结束后的最新信息判断可靠清除，其次按均匀先验的
-        成功概率做试探清除。
+决策4   是否清除某频率：以第三项结束后的最新信息判断可靠清除，其次按下注判据
+        做试探清除（置信层开启时为"B(p,20) 内后验质量 ≥ 阈值"，关闭时为
+        均匀先验成功概率）。
 决策5   是否结束：全部频道已清除或已排除、清除数达上限、或时间预算不足时退出。
 
 模型要点
@@ -16,7 +17,10 @@
    N/T，故所有选项按"期望秒数 / 期望清除数"比较，越小越好。
 2. 严格结论（频道排除、可靠清除、成功概率）一律由 `problem3_model` 的细格网给出；
    前瞻评分在粗格网上完成，不参与任何结论。
-3. 真实运行时间上限 20 分钟，而单次检测只消耗虚拟时间。策略用单调时钟估计
+3. 贝叶斯置信层（`problem3_belief`，Koopman 最优搜索论）只在证书层之上提供
+   "排序与下注"：后验置信图、后验期望剩余距离、后验质量排序。置信图支持集
+   恒为证书掩码的子集，`belief_enabled=False` 时策略与基线逐动作一致。
+4. 真实运行时间上限 20 分钟，而单次检测只消耗虚拟时间。策略用单调时钟估计
    "还能发多少个动作"，容量不足时自动降级为只追已发现目标，保证能正常退出。
 """
 from __future__ import annotations
@@ -35,6 +39,7 @@ from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      MAX_SOURCE_COUNT, MIN_SOURCE_COUNT,
                      MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M, ROBOT_SPEED_MPS,
                      TARGET_RADIUS_M)
+from .problem3_belief import ChannelBelief
 from .problem3_model import ChannelKnowledge, Lattice, apply_direction, hex_waypoints
 from .strategy import BudgetReached
 
@@ -132,6 +137,24 @@ class Problem3Config:
     turn_penalty_min_leg_m: float = 200.0
     speculative_clear_m: float = 45.0
     speculative_min_probability: float = 0.30
+    # 贝叶斯置信层（Koopman 最优搜索论的"排序与下注"层，见 problem3_belief）。
+    # 红线：证书层（可证清除、频道排除、结束判据）原样保留，置信层只改排序
+    # 与试探清除的下注判据；belief_enabled=False 时与基线逐动作一致。
+    belief_enabled: bool = True
+    # 示向误差高斯核的标准差：真实演练实测残差约 0.42°（证书层仍用 ±1° 最坏界）。
+    belief_direction_std_deg: float = 0.42
+    # 试探清除判据：B(p,20) 内后验质量 ≥ 该阈值即下注（替代最坏 45 m 距离界）。
+    belief_clear_min_mass: float = 0.50
+    # >0 时为下注保留一道最坏情形距离上界（0 表示纯后验质量判据）。
+    belief_clear_max_distance_m: float = 0.0
+    # 追击评分与频道排序改用后验期望剩余距离（替代均匀平均/最坏距离）。
+    belief_chase_expectation: bool = True
+    # 追击评分用的后验分位数（0 = 期望均值；0<q<=1 取加权 q 分位数）。
+    # 纯均值偏风险偏好（低概率长尾被折扣），分位数越高越接近基线的最坏口径。
+    # 2026-09-12 扫档：均值（q=0）在 5 案例上最优，q=0.7/0.9 均略差，默认 0。
+    belief_chase_quantile: float = 0.0
+    # 同站频道排序改按"可排除后验质量"（增益阈值仍用证书口径的面积）。
+    belief_search_ranking: bool = True
     real_time_reserve_s: float = 15.0
     min_action_capacity: int = 10
     max_rounds: int = 400
@@ -190,6 +213,22 @@ class Problem3Config:
             raise ValueError('双站交会偏距必须为非空的有限正数序列。')
         if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
             raise ValueError('追踪路径限制必须非负且有限。')
+        for name in ('belief_direction_std_deg',):
+            value = getattr(self, name)
+            if not np.isfinite(value) or value <= 0:
+                raise ValueError(f'{name} 必须为有限正数。')
+        mass = self.belief_clear_min_mass
+        if not np.isfinite(mass) or not 0.0 < mass <= 1.0:
+            raise ValueError('belief_clear_min_mass 必须在 (0, 1] 内。')
+        cap = self.belief_clear_max_distance_m
+        if not np.isfinite(cap) or cap < 0:
+            raise ValueError('belief_clear_max_distance_m 必须为非负有限数。')
+        quantile = self.belief_chase_quantile
+        if not np.isfinite(quantile) or not 0.0 <= quantile <= 1.0:
+            raise ValueError('belief_chase_quantile 必须在 [0, 1] 内。')
+        for name in ('belief_enabled', 'belief_chase_expectation', 'belief_search_ranking'):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f'{name} 必须为布尔值。')
         if not self.lookahead_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.lookahead_lengths_m):
             raise ValueError('前瞻步长必须为非空的有限正数序列。')
 
@@ -242,6 +281,12 @@ class Problem3Strategy:
         self.candidates = self._build_candidates()
         self.channels = {channel: ChannelKnowledge(channel, self.fine, self.coarse)
                          for channel in range(1, CHANNEL_COUNT + 1)}
+        # 贝叶斯置信层：只用于排序与下注；关闭时不创建，全部查询走基线路径。
+        self.beliefs = None
+        if self.config.belief_enabled:
+            self.beliefs = {channel: ChannelBelief(self.fine, self.coarse,
+                                                   self.config.belief_direction_std_deg)
+                            for channel in self.channels}
         self.position = tuple(float(value) for value in context.state.position)
         self.current_channel = int(context.state.channel)
         self.cleared: set = set()
@@ -356,7 +401,11 @@ class Problem3Strategy:
         return count * self.fine.spacing_m ** 2
 
     def _search_options(self, waypoint, min_gain, cap):
-        """一个停靠点上值得检测的频道：已发现频道全取，未发现频道按增益取前 cap 个。"""
+        """一个停靠点上值得检测的频道：已发现频道全取，未发现频道按增益取前 cap 个。
+
+        增益阈值始终用证书口径的新增排除面积；排序键在置信层开启时改为
+        "该站可排除的后验质量"（Koopman 期望清除概率质量），关闭时与基线一致。
+        """
         detected, searchable = [], []
         for channel in self._active_channels():
             if not self._station_is_new(channel, waypoint):
@@ -367,11 +416,18 @@ class Problem3Strategy:
             if self.channels[channel].status == 'detected':
                 detected.append((channel, gain))
             elif gain >= min_gain:
-                searchable.append((channel, gain))
-        searchable.sort(key=lambda item: -item[1])
+                rank = self._search_rank(channel, waypoint, gain)
+                searchable.append((channel, rank))
+        searchable.sort(key=lambda item: (-item[1], item[0]))
         if cap is not None:
             searchable = searchable[:cap]
         return [channel for channel, _ in detected] + [channel for channel, _ in searchable]
+
+    def _search_rank(self, channel, waypoint, gain):
+        """站内未发现频道的排序键：置信层开启时按可排除后验质量。"""
+        if self.beliefs is not None and self.config.belief_search_ranking:
+            return self.beliefs[channel].mass_excluded(self._reach(waypoint))
+        return gain
 
     def _measure_gain(self, channels, waypoint):
         """一组检测在该停靠点可新增排除的总格点面积。"""
@@ -403,6 +459,12 @@ class Problem3Strategy:
                 center, radius = self.channels[channel].region_estimate(use_fine=True)
                 return (limit if center is None else self._travel_m(center) + radius * 0.25, channel)
             detected.sort(key=region_cost)
+        elif self.beliefs is not None and self.config.belief_chase_expectation:
+            # 风险敏感排序：按后验期望/分位数剩余距离选频道（只改排序，不改判据）。
+            def expected_cost(item):
+                _, channel = item
+                return (self._belief_distance_key(channel, self.position), channel)
+            detected.sort(key=expected_cost)
         else:
             detected.sort()
         options = []
@@ -520,10 +582,27 @@ class Problem3Strategy:
 
     def _clear_expectation_s(self, channel, waypoint, measures):
         """追捕选项的期望耗时：移动 + 检测 + 期望剩余距离 + 末端定位清除。"""
-        predicted = self._predicted_series(channel, waypoint)
-        remaining = float(np.mean(predicted)) if predicted else 0.0
         return (self._travel_s(waypoint) + self._measure_cost_s(measures)
-                + remaining / ROBOT_SPEED_MPS + self.config.endgame_seconds)
+                + self._expected_remaining_s(channel, waypoint)
+                + self.config.endgame_seconds)
+
+    def _expected_remaining_s(self, channel, waypoint):
+        """剩余距离的期望秒数：置信层开启时用后验期望/分位数，否则用均匀平均。"""
+        belief = self.beliefs.get(channel) if self.beliefs else None
+        if belief is not None and self.config.belief_chase_expectation:
+            distance = self._belief_distance_key(channel, waypoint)
+        else:
+            predicted = self._predicted_series(channel, waypoint)
+            distance = float(np.mean(predicted)) if predicted else 0.0
+        return distance / ROBOT_SPEED_MPS
+
+    def _belief_distance_key(self, channel, waypoint):
+        """置信层的剩余距离评分键：q>0 取后验加权 q 分位数，否则取期望。"""
+        belief = self.beliefs[channel]
+        quantile = self.config.belief_chase_quantile
+        if quantile > 0.0:
+            return belief.quantile_distance_m(waypoint, quantile)
+        return belief.expected_distance_m(waypoint)
 
     def _chase_waypoint(self, channel, knowledge, limit):
         """决策2：给出追捕该频道时本次的停靠点。
@@ -1498,6 +1577,9 @@ class Problem3Strategy:
         if result == 'direction':
             bearing = float(response['svd_deg'])
             knowledge.observe_direction(waypoint[0], waypoint[1], bearing, virtual)
+            if self.beliefs is not None:
+                self.beliefs[channel].observe_direction(knowledge, waypoint[0],
+                                                        waypoint[1], bearing)
             # 普通有效示向由物理接收上界给出 U<=1500；若本次来自保证性追踪，
             # 余弦定理给出的 qU 更紧，且与随机场景和位置先验无关。
             upper = (MAX_RECEIVE_RADIUS_M
@@ -1510,10 +1592,14 @@ class Problem3Strategy:
             self.tracking_wait_rounds[channel] = 0
         elif result == 'near':
             knowledge.observe_near(waypoint[0], waypoint[1], virtual)
+            if self.beliefs is not None:
+                self.beliefs[channel].observe_near(knowledge, waypoint[0], waypoint[1])
             self.tracking_states.pop(channel, None)
             self.tracking_wait_rounds[channel] = 0
         else:
             knowledge.observe_no_signal(waypoint[0], waypoint[1], virtual)
+            if self.beliefs is not None:
+                self.beliefs[channel].observe_no_signal(knowledge, waypoint[0], waypoint[1])
         if result in ('direction', 'near'):
             # 出现新发现即推翻"剩余频道均无信号"的补证游前提。
             self.absence_tour = None
@@ -1534,7 +1620,13 @@ class Problem3Strategy:
         return acted
 
     def _clear_candidates(self, waypoint):
-        """决策4：以第三项结束后的最新信息判断是否清除。"""
+        """决策4：以第三项结束后的最新信息判断是否清除。
+
+        可证清除（证书层）原样优先；试探清除是**下注**而非结论——置信层开启时
+        判据改为"B(p,20) 内后验质量 ≥ 阈值"并按质量降序下注（Koopman 口径），
+        关闭时保留均匀先验的历史口径。清除成败由模拟器结算，失败本身会把
+        B(p,20) 写回证书掩码，因此下注不损害"确保所有干扰源被清除"的红线。
+        """
         certain, speculative = [], []
         for channel in self._observed_channels():
             knowledge = self.channels[channel]
@@ -1545,14 +1637,32 @@ class Problem3Strategy:
                     or self._tracking_certain_clear(channel, waypoint)):
                 certain.append(channel)
                 continue
-            limit = knowledge.max_distance_m(waypoint[0], waypoint[1])
-            if limit is None or limit > self.config.speculative_clear_m:
-                continue
-            probability = knowledge.clear_probability(waypoint[0], waypoint[1])
-            if probability >= self.config.speculative_min_probability:
-                speculative.append((probability, channel))
+            bet = self._speculative_bet(knowledge, waypoint)
+            if bet is not None:
+                speculative.append(bet)
         speculative.sort(key=lambda item: -item[0])
         return certain + [channel for _, channel in speculative]
+
+    def _speculative_bet(self, knowledge, waypoint):
+        """返回 (下注评分, 频道)；不满足下注判据时返回 None。"""
+        if self.beliefs is None:
+            limit = knowledge.max_distance_m(waypoint[0], waypoint[1])
+            if limit is None or limit > self.config.speculative_clear_m:
+                return None
+            probability = knowledge.clear_probability(waypoint[0], waypoint[1])
+            if probability < self.config.speculative_min_probability:
+                return None
+            return probability, knowledge.channel
+        cap = self.config.belief_clear_max_distance_m
+        if cap > 0.0:
+            limit = knowledge.max_distance_m(waypoint[0], waypoint[1])
+            if limit is None or limit > cap:
+                return None
+        belief = self.beliefs[knowledge.channel]
+        mass = belief.mass_within(waypoint[0], waypoint[1], CLEAR_RADIUS_M)
+        if mass < self.config.belief_clear_min_mass:
+            return None
+        return mass, knowledge.channel
 
     def _tracking_certain_clear(self, channel, waypoint):
         """判断保证性追踪上界是否已在当前停靠点进入 20 m 清除半径。"""
@@ -1569,10 +1679,15 @@ class Problem3Strategy:
         if response['clear_result'] == 'success':
             knowledge.mark_cleared(virtual)
             self.cleared.add(channel)
+            if self.beliefs is not None:
+                self.beliefs[channel].mark_cleared()
             self.tracking_states.pop(channel, None)
             self.tracking_wait_rounds[channel] = 0
         else:
             knowledge.observe_clear_failure(waypoint[0], waypoint[1], virtual)
+            if self.beliefs is not None:
+                self.beliefs[channel].observe_clear_failure(knowledge,
+                                                            waypoint[0], waypoint[1])
         self._record(channel, 'clear', response['clear_result'], response)
         self._sample_channel(channel)
 
