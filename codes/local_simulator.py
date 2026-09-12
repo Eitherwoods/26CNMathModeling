@@ -34,7 +34,7 @@ from urllib.parse import urlsplit
 GEN_RULES = {
     "schema": "practice-gen-rules-v1",
     "field_1800m_um": 1_800_000_000,
-    "jammer_disk_radius_um": 1_770_000_000,   # 落点均匀圆盘（uniform_disk_area）
+    "jammer_disk_radius_um": 1_800_000_000,   # 落点均匀圆盘（uniform_disk_area）；2026-09-13 修正：题目目标区域半径为 1800 m
     "field_30m_um": 30_000_000,
     "field_335_614m_um": 335_613_962,
     "receive_min_um": 1_000_000_000,          # 接收半径下限（uniform_integer_um）
@@ -112,8 +112,8 @@ class CounterSource:
 
 # ------------------------------------------------------------- 场景生成 ----
 def _inside_jammer_disk(x_um: int, y_um: int) -> bool:
-    """官方用 math/big 精确整数：|x|^2+|y|^2 <= 1770000000^2。"""
-    return abs(x_um) * abs(x_um) + abs(y_um) * abs(y_um) <= 1_770_000_000 ** 2
+    """官方用 math/big 精确整数：|x|^2+|y|^2 <= 1800000000^2（题目目标区域半径 1800 m）。"""
+    return abs(x_um) * abs(x_um) + abs(y_um) * abs(y_um) <= 1_800_000_000 ** 2
 
 
 def generate_practice(problem: int, key: bytes) -> dict:
@@ -136,7 +136,7 @@ def generate_practice(problem: int, key: bytes) -> dict:
     for ch in selected:
         while True:  # 官方落点拒绝采样：半径/角度成对重抽
             v = cs.next(f"jammer/{ch}/radius")
-            r = 1_770_000_000.0 * math.sqrt((v >> 11) * TWO_POW_53)
+            r = 1_800_000_000.0 * math.sqrt((v >> 11) * TWO_POW_53)
             v = cs.next(f"jammer/{ch}/theta")
             ang = ((v >> 11) * TWO_POW_53) * TWO_PI
             x_um = go_round(math.cos(ang) * r)

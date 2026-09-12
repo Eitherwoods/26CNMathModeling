@@ -274,7 +274,7 @@ HTTP传输需显式构造 `HttpTransport(base_url, allow_network=True)` 并传�
 ## 本地演练模拟器（官方算法复刻，2026-09-12 新增）
 
 `codes/local_simulator.py` 是对官方 `jammers-simulator.exe` 演练模式的**逆向复刻**：
-随机数（HMAC-SHA256 计数器源）、场景生成分布（源数 10..16、信道洗牌、1770 m 圆盘落点、
+随机数（HMAC-SHA256 计数器源）、场景生成分布（源数 10..16、信道洗牌、1800 m 圆盘落点、
 接收半径 1000..1500 m）、空间示向度噪声（BLAKE2b-64 值噪声 + smoothstep 插值 + ±1° 限幅 +
 1/100 度量化）、动作判定与虚拟时间计费（5 m/s 移动、measure 5 s+换信道 1 s、clear 5 s/3 s、
 near ≤5 m、20 m 清除半径）均按反编译结果实现，时序模型已用真实演练日志 248 条转移逐条验证。

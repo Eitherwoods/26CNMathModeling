@@ -25,6 +25,7 @@ from . import config as settings
 from .problem3_model import Lattice
 from .problem3_solution import summarize as summarize_base
 from .problem4_model import (Problem4Knowledge, optimized_search_waypoints,
+                             ring_search_waypoints,
                              ordered_search_route, triangular_search_waypoints)
 from .strategy import BudgetReached
 
@@ -36,6 +37,11 @@ class Problem4Config:
     lattice_spacing_m: float = settings.PROBLEM4_LATTICE_SPACING_M
     search_spacing_m: float = settings.PROBLEM4_SEARCH_SPACING_M
     search_layout: str = settings.PROBLEM4_SEARCH_LAYOUT
+    # 同心环布站（search_layout='rings'）的 (半径, 环上点数) 与整体角度偏移。
+    ring_inner_m: tuple = settings.PROBLEM4_RING_INNER
+    ring_middle_m: tuple = settings.PROBLEM4_RING_MIDDLE
+    ring_outer_m: tuple = settings.PROBLEM4_RING_OUTER
+    ring_offset_deg: float = settings.PROBLEM4_RING_OFFSET_DEG
     orientation_bins: int = settings.PROBLEM4_ORIENTATION_BINS
     radius_bins: int = settings.PROBLEM4_RADIUS_BINS
     hypothesis_limit: int = settings.PROBLEM4_HYPOTHESIS_LIMIT
@@ -70,6 +76,7 @@ class Problem4Config:
     lls_probe_max_mask_dist_m: float = 200.0
     lls_probe_min_separation_m: float = 25.0
     fallback_center_first: bool = False
+    fallback_mec_weight: float = 2.0
     # 区域中心选法：'bbox'=外包盒中心；'mec'=最小包围圆近似中心（候选点，
     # 可靠清除仍由全体单元距离判据把关）。追踪候选可附加定距接近环；
     # 后备清除停靠时可选择性顺带测量已发现频道。
@@ -97,6 +104,8 @@ class Problem4Config:
             raise ValueError('lls_probe 必须为布尔值。')
         if not isinstance(self.fallback_center_first, bool):
             raise ValueError('fallback_center_first 必须为布尔值。')
+        if not np.isfinite(self.fallback_mec_weight) or self.fallback_mec_weight < 0:
+            raise ValueError('后备点MEC权重必须为非负有限值。')
         if (type(self.lls_probe_min_reads) is not int or self.lls_probe_min_reads < 2):
             raise ValueError('lls_probe_min_reads 必须为不小于2的整数。')
         if (not np.isfinite(self.lls_probe_max_mask_dist_m)
@@ -119,8 +128,8 @@ class Problem4Config:
             raise ValueError('路线优化启动阈值必须是0到16的整数。')
         if not (0 < self.lattice_spacing_m * np.sqrt(2) / 2 < settings.CLEAR_RADIUS_M):
             raise ValueError('位置单元覆盖半径必须严格小于20米。')
-        if self.search_layout not in ('triangular', 'optimized'):
-            raise ValueError("搜索布站只允许 'triangular' 或 'optimized'。")
+        if self.search_layout not in ('triangular', 'optimized', 'rings'):
+            raise ValueError("搜索布站只允许 'triangular'、'optimized' 或 'rings'。")
         if self.search_layout == 'triangular' and not 0 < self.search_spacing_m <= settings.MIN_RECEIVE_RADIUS_M:
             raise ValueError('搜索三角形边长必须在(0,1000]米内。')
         for value in (self.orientation_bins, self.radius_bins, self.hypothesis_limit,
@@ -209,6 +218,11 @@ class Problem4Strategy:
         self.lattice = Lattice.build(self.config.lattice_spacing_m)
         self.waypoints = (triangular_search_waypoints(self.config.search_spacing_m)
                           if self.config.search_layout == 'triangular'
+                          else ring_search_waypoints(self.config.ring_inner_m,
+                                                     self.config.ring_middle_m,
+                                                     self.config.ring_outer_m,
+                                                     self.config.ring_offset_deg)
+                          if self.config.search_layout == 'rings'
                           else optimized_search_waypoints())
         self.search_route_order = (ordered_search_route(self.waypoints, np.zeros(2))
                                    if self.config.search_route == 'tour' else None)
@@ -345,13 +359,21 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         return point
 
     def _fallback_point(self, knowledge):
-        """首次后备清除可先访问区域中心附近单元，失败后恢复最近单元扫描。"""
+        """在存活格点中兼顾当前位置和MEC，生成短而连续的后备清除链。"""
         reference = self.position
         if self.config.fallback_center_first and not knowledge.clear_positions:
             center, _ = knowledge.region_estimate(self.config.clear_center_mode)
             if center is not None:
                 reference = center
-        return knowledge.fallback_point(reference)
+        points = knowledge.possible_points()
+        if not len(points):
+            return None
+        center, _ = knowledge.region_estimate('mec')
+        if center is None or self.config.fallback_mec_weight <= 0:
+            return knowledge.fallback_point(reference)
+        score = (np.linalg.norm(points - reference, axis=1)
+                 + self.config.fallback_mec_weight * np.linalg.norm(points - center, axis=1))
+        return points[int(np.argmin(score))].copy()
 
     def _tracking_plan(self, channel):
         """先限定有限追踪轮数，再转入覆盖清除，防止失联后无限往返。"""
@@ -408,6 +430,28 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             return float('inf') if point is None else float(np.linalg.norm(point - self.position))
         return float(np.linalg.norm(center - self.position))
 
+    def _tracking_route_extension(self, start, channel, detected):
+        """估计执行当前频道后，按保守中心访问其余频道的最短开放路线。
+
+        该量只用于频道调度的二级排序。路线中的点来自当前频道知识的
+        `region_estimate`，不作为可靠清除点，也不改变任何证据和完成判据。
+        每次决策都会重新计算，因此无信号、示向和清除失败造成的排除会立即
+        反映到下一轮的路线估计中。
+        """
+        points = []
+        for other in detected:
+            if other == channel:
+                continue
+            center, _ = self.channels[other].region_estimate(self.config.clear_center_mode)
+            if center is not None:
+                points.append(np.asarray(center, dtype=float))
+        if not points:
+            return 0.0
+        points = np.asarray(points, dtype=float)
+        order = open_route_order(points, np.asarray(start, dtype=float), starts=1)
+        route = np.vstack((np.asarray(start, dtype=float), points[order]))
+        return float(np.linalg.norm(np.diff(route, axis=0), axis=1).sum())
+
     def _next_channel(self, detected):
         """优先服务行进代价最小的已发现频道，超过公平年龄的频道强制优先。
 
@@ -448,6 +492,11 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
                     if candidate.kind == 'track':
                         hypotheses = self.channels[candidate.channel].planning_hypotheses(self.config.hypothesis_limit)
                         seconds += feedback_score(hypotheses, candidate.waypoint)[0] / settings.ROBOT_SPEED_MPS + 60.
+                    # 将当前候选接入其余已发现频道的开放路线，避免即时最优
+                    # 把机器狗带到路线末端后再跨区折返。
+                    seconds += self._tracking_route_extension(
+                        candidate.waypoint, candidate.channel, detected
+                    ) / settings.ROBOT_SPEED_MPS
                     return seconds, candidate.channel
                 plan = min(plans, key=planned_seconds) if plans else None
             else:

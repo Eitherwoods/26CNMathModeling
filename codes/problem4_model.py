@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from .config import (CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M, MIN_RECEIVE_RADIUS_M,
@@ -363,6 +365,31 @@ _OPTIMIZED_WAYPOINTS = [
     (341.55, 1868.82),
 ]
 
+
+def ring_search_waypoints(inner=(800.0, 6), middle=(1600.0, 11), outer=(1900.0, 12),
+                          offset_deg=0.0):
+    """同心环布站：中心 1 点 + 三圈等角环（默认 1+6+11+12=30 点）。
+
+    判据与三角格/优化布站一致：目标圆域内每个位置单元对**任意朝向**都存在
+    保证可读的测站。与 `optimized` 28 点的关键差别是用求解器自身的方向位图
+    证书 `search_evidence.DirectionalCoverage`（20 m 单元、24 朝向 bin）
+    逐站累乘验收：优化 28 点在全部顶点遍历后仍余 38 个单元存在未排除朝向
+    （证书有空洞），本环结构为 **0 个**（完整）。
+
+    几何来源（2026-09-13 推导 + 密采样复核）：边界点 p(1800) 的全部覆盖
+    顶点必落在 ±33.2° 楔形内（1800·sinδ ≤ 986），且方位最大空隙须 ≤180°，
+    ⇒ 外环至少 12 个 spokes、半径 ≥1863 m；中环承担中半径环带的"外向"
+    方位，内环+中心负责 r≲1000 的包围。外环巡回 ≥10.4 km 是证书地板。
+
+    本地官方同构 Engine 24 种子实测 615.5 s/源（原 optimized28 为 662.0，
+    −7.05%），移动 27207 m（原 29577 m），检测 322 次（原 339 次）。
+    """
+    points = [(0.0, 0.0)]
+    for radius, count in (inner, middle, outer):
+        for i in range(count):
+            angle = math.radians(offset_deg + i * 360.0 / count)
+            points.append((radius * math.cos(angle), radius * math.sin(angle)))
+    return np.asarray(points, dtype=float)
 
 def optimized_search_waypoints():
     """返回启发式布站优化的搜索顶点（比三角格少且证书余量经密采样验证）。

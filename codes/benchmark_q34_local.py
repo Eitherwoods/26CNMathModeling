@@ -1,6 +1,16 @@
 # -*- coding: utf-8 -*-
-"""q3/q4 本地官方 Engine 基准：确定性场景、进程内传输和完整回放记录。"""
+"""q3/q4 本地官方 Engine 基准：确定性场景、进程内传输和完整回放记录。
+
+线程纪律（2026-09-13）：多线程 BLAS 的归约顺序随负载/线程调度变化，会被
+策略决策阈值放大成 ±3% 的过程级虚拟时间漂移，使跨进程/跨批次的 A/B 对比
+失效（实测同一配置漂移 -65~+36 s/任务）。本模块在导入 numpy 前把线程数
+固定为 1，保证任意两次运行逐位可比；需要并行的实验应分进程串行执行。
+"""
 from __future__ import annotations
+import os
+for _thread_var in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS',
+                    'NUMEXPR_NUM_THREADS', 'VECLIB_MAXIMUM_THREADS'):
+    os.environ.setdefault(_thread_var, '1')
 import argparse, dataclasses, hashlib, importlib.metadata, importlib.util, json, math, platform, subprocess, sys, time
 from pathlib import Path
 from .local_simulator import Engine, SimError, generate_practice

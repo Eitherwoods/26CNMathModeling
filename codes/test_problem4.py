@@ -10,6 +10,7 @@ import json
 import os
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -22,7 +23,8 @@ from .config import (MIN_RECEIVE_RADIUS_M, PROBLEM4_OUTPUT_DIR, PROTOCOL_LOG_DIR
 from .offline_stub import OfflineStub, Source
 from .problem3_model import Lattice
 from .problem4_model import (Problem4Knowledge, optimized_search_waypoints,
-                             triangular_search_waypoints)
+                             triangular_search_waypoints,
+                             ring_search_waypoints)
 from .problem4_solution import (Problem4Config, Problem4Strategy, StopPlan,
                                 build_scenario, feedback_score, is_offline_run,
                                 main, run_mission, solve, summarize)
@@ -242,7 +244,14 @@ class StrategyEvidenceTests(unittest.TestCase):
             Problem4Config(finish_detected_before_search=1)
 
     def test_detected_target_postpones_search_and_search_resumes(self):
-        """目标未清除时连续追踪，清除后仍恢复原覆盖计划。"""
+        """finish_detected_before_search=True 时目标未清除则连续追踪，清除后仍恢复原覆盖计划。
+
+        2026-09-13 起默认配置改为与 search_interval=1 成对的 False（交错搜索，
+        见 codes/config.py 的扫档证据）；本测试显式启用门控开关，锁定该机制
+        本身的语义不被后续改动破坏。
+        """
+        self.strategy.config = replace(self.strategy.config,
+                                       finish_detected_before_search=True)
         self.strategy.round = 4
         self.strategy.channels[1].status = 'detected'
         track = StopPlan(np.array([100.0, 0.0]), 'track', channel=1)
@@ -416,14 +425,17 @@ class AdaptiveTrackingTests(unittest.TestCase):
             Problem4Config(shared_gain_weight_s=-5.0)
         with self.assertRaises(ValueError):
             Problem4Config(shortlist_radius_factor=0.9)
+        with self.assertRaises(ValueError):
+            Problem4Config(fallback_mec_weight=-0.1)
 
     def test_search_layout_must_be_known(self):
-        """布站设计只允许两种实现；三角格口径下边长上限仍然生效。"""
+        """布站设计只允许三种实现；三角格口径下边长上限仍然生效。"""
         with self.assertRaises(ValueError):
             Problem4Config(search_layout='spiral')
         with self.assertRaises(ValueError):
             Problem4Config(search_layout='triangular', search_spacing_m=1001)
-        self.assertEqual(Problem4Config(search_spacing_m=1001).search_layout, 'optimized')
+        self.assertEqual(Problem4Config(search_spacing_m=1001).search_layout,
+                         settings.PROBLEM4_SEARCH_LAYOUT)
 
 
 class SearchCertificateTests(unittest.TestCase):
@@ -437,11 +449,52 @@ class SearchCertificateTests(unittest.TestCase):
     def setUpClass(cls):
         """预生成两套搜索顶点与区域内采样网格，供各项证书共用。"""
         cls.layouts = {'triangular900': triangular_search_waypoints(900.0),
-                       'optimized': optimized_search_waypoints()}
+                       'optimized': optimized_search_waypoints(),
+                       'rings': ring_search_waypoints()}
         step = 300.0
         axis = np.arange(-TARGET_RADIUS_M, TARGET_RADIUS_M + step, step)
         cls.samples = np.array([(x, y) for x in axis for y in axis
                                 if np.hypot(x, y) <= TARGET_RADIUS_M + 1e-9])
+
+    def test_default_layout_has_complete_directional_certificate(self):
+        """默认布站的方向位图证书必须完整：遍历全部顶点后无残余可能朝向。
+
+        用求解器自身的 `search_evidence.DirectionalCoverage`（20 m 位置单元、
+        24 个朝向分箱）逐站累乘，要求每个单元的全部朝向都被排除。这是"频道
+        不存在"结论的真正依据；启发式 `optimized` 28 点在此判据下仍余 38 个
+        单元有未排除朝向（证书有空洞），因此不得作为默认。本测试同时锁住
+        `triangular900` 的完整性与 `optimized` 的已知空洞，防止回退。
+        """
+        from .search_evidence import DirectionalCoverage
+        spacing = 20.0
+        axis = np.arange(-TARGET_RADIUS_M, TARGET_RADIUS_M + spacing, spacing)
+        xs, ys = np.meshgrid(axis, axis)
+        keep = np.hypot(xs, ys) <= TARGET_RADIUS_M + 1e-9
+        cells = np.column_stack((xs[keep], ys[keep]))
+
+        class _Lattice:
+            points = cells
+            covering_radius_m = spacing * np.sqrt(2.0) / 2.0
+
+        coverage = DirectionalCoverage(_Lattice, settings.PROBLEM4_ORIENTATION_BINS)
+
+        def residual(points):
+            mask = coverage.new_mask()
+            for q in points:
+                mask = coverage.update(mask, (float(q[0]), float(q[1])))
+            return int(np.count_nonzero(mask))
+
+        self.assertEqual(residual(triangular_search_waypoints(900.0)), 0)
+        self.assertEqual(residual(ring_search_waypoints()), 0)
+        default = (triangular_search_waypoints(settings.PROBLEM4_SEARCH_SPACING_M)
+                   if settings.PROBLEM4_SEARCH_LAYOUT == 'triangular'
+                   else ring_search_waypoints()
+                   if settings.PROBLEM4_SEARCH_LAYOUT == 'rings'
+                   else optimized_search_waypoints())
+        self.assertEqual(residual(default), 0,
+                         '默认布站的方向证书存在空洞，不能保证 100% 清除')
+        # 已知缺陷留档：optimized 28 点在 25445 个单元中仍有单元未被完全排除。
+        self.assertGreater(residual(optimized_search_waypoints()), 0)
 
     def test_covering_radius_keeps_margin_below_min_receive_radius(self):
         """区域上每个目标到最近顶点的距离必须小于最小有效接收半径。"""

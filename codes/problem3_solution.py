@@ -68,6 +68,8 @@ class Problem3Config:
     local_lookahead_limit_m: float = 500.0
     approach_direct_m: float = 400.0
     # 追踪途中已经支付了移动代价，多测几个有价值频道通常比日后专程折返更省时。
+    # 2026-09-13 曾采纳 3→8，后经顺序单线程确定性对照复检：该档位的观测差
+    # 落在并行基准的线程/负载噪声带内（±1%），证据不足，回退 3。
     search_channels_per_stop: int = 3
     # 2026-09-12 联调复扫：1.5e5 比旧值 5e4 端到端再省 ~0.9%（基准 299.2 s/源；
     # 留出种子 331.8 vs 336.4），方向在两组独立案例上一致。
@@ -139,6 +141,21 @@ class Problem3Config:
     lls_probe: bool = True
     lls_probe_min_reads: int = 2
     lls_probe_max_mask_dist_m: float = 200.0
+    # 自适应证书收尾（2026-09-13 新增，默认关闭）：收尾阶段（无已发现频道）
+    # 不再受固定候选格网约束，直接在"未排除格点并集"上就地选择覆盖站位：
+    # 以粗格网界内点为候选位形，取新增排除面积达到近优比例的候选中离当前
+    # 位置最近者。动机：本地基准（12 种子官方同构 Engine）显示证书尾巴占
+    # 全程 0—38%，固定格点站与空洞几何错配造成 2000+ m 级空跑；自适应站位
+    # 把"补最后一小块"的行进压到最短。V3 参考实现（FlexibleCoverage）的
+    # 同型思想：覆盖站位只需盖住残余关键格点，位置本身完全自由。
+    adaptive_certificate: bool = False
+    adaptive_cert_good_ratio: float = 0.9
+    adaptive_cert_max_chain_stations: int = 16
+    # 触发上限：未排除格点并集面积不超过该值时才启用自适应收尾。残余并集
+    # 还很大时（任务中段）"就近覆盖"规则会产生 1000+ m 级长跳并与发现型
+    # 搜索冲突（seed5 实测 +76% 虚拟时间）；残余只剩 1—2 站覆盖量时，
+    # 就地选站才比固定格点更省行进。
+    adaptive_cert_max_pending_m2: float = 4.0e6
     lls_probe_min_separation_m: float = 25.0
     # 失败分支的期望返工成本（秒）：试探失败后机器人已站在交会点，掩码已排除
     # B(试探点,20 m)，下一动作通常是一次近距读数（6 s）+ 剩余逼近与收尾
@@ -233,6 +250,14 @@ class Problem3Config:
             raise ValueError('双站交会偏距必须为非空的有限正数序列。')
         if not isinstance(self.lls_probe, bool):
             raise ValueError('lls_probe 必须为布尔值。')
+        if not isinstance(self.adaptive_certificate, bool):
+            raise ValueError('adaptive_certificate 必须为布尔值。')
+        if not np.isfinite(self.adaptive_cert_good_ratio) or not 0.0 < self.adaptive_cert_good_ratio <= 1.0:
+            raise ValueError('adaptive_cert_good_ratio 必须在 (0, 1] 内。')
+        if (isinstance(self.adaptive_cert_max_chain_stations, bool)
+                or not isinstance(self.adaptive_cert_max_chain_stations, int)
+                or self.adaptive_cert_max_chain_stations < 1):
+            raise ValueError('adaptive_cert_max_chain_stations 必须为正整数。')
         if (isinstance(self.lls_probe_min_reads, bool)
                 or not isinstance(self.lls_probe_min_reads, int)
                 or self.lls_probe_min_reads < 2):
@@ -928,6 +953,15 @@ class Problem3Strategy:
                 and not self._detected_channels()):
             dynamic_plan = self._backstop_search_plan(remaining_sources)
 
+        # 自适应证书收尾：与路线前瞻兜底同触发条件，站位完全由残余格点决定，
+        # 不再依赖固定候选格网。首站真实返回示向或近场时下一轮立即恢复追踪。
+        if (self.config.adaptive_certificate
+                and len(self.cleared) >= self.config.route_endgame_min_clears
+                and not self._detected_channels()):
+            adaptive_plan = self._adaptive_certificate_plan()
+            if adaptive_plan is not None:
+                return adaptive_plan
+
         # 已清除源较多时，“剩余频道实际不存在”已经是不可忽略的情景。此处在
         # 掩码副本上模拟无信号结果，估计完整补证路线并只执行最优路线的首站。
         # 若首站真实返回示向或近场，下一轮会立即退出本分支并恢复追踪。
@@ -942,6 +976,96 @@ class Problem3Strategy:
         if plans:
             return min(plans, key=lambda plan: plan.score_s)
         return self._backstop_search_plan(remaining_sources)
+
+    def _adaptive_certificate_plan(self):
+        """自适应证书收尾：在"未排除格点并集"上就地选站，执行首站。
+
+        与 `_route_aware_endgame_plan` 的区别：候选站位不再限于固定格网，
+        而是粗格网全部界内点。选站规则（V3 FlexibleCoverage 同型思想）：
+        取新增排除面积达到近优比例（`adaptive_cert_good_ratio` × 最大增益）
+        的候选中离当前位置最近者——站位只需盖住残余关键格点，位置本身自由。
+
+        评分（`score_s`）为"贪心覆盖链"的总耗时估计：从当前位置出发，反复
+        就地选站并假设全部无信号，直到粗格网残余并集清空；只执行链上首站，
+        其后逐轮重规划。模拟全程使用掩码副本，不触碰真实知识状态；结论
+        仍由细格网掩码与覆盖证书把关。
+        """
+        active = [channel for channel in self._active_channels()
+                  if self.channels[channel].status == 'unknown']
+        if not active:
+            return None
+        coarse = self.coarse
+        pending = np.zeros(len(coarse.points), dtype=bool)
+        for channel in active:
+            pending |= self.channels[channel].plan_mask
+        if not np.any(pending):
+            return None
+        # 残余并集还很大时不接管：发现型搜索（sweep/追击）仍是更优主线，
+        # 就地选站只在"补最后 1—2 站覆盖量"的收尾窗口使用。
+        pending_area_m2 = float(np.count_nonzero(pending)) * coarse.spacing_m ** 2
+        if pending_area_m2 > self.config.adaptive_cert_max_pending_m2:
+            return None
+        reach_radius = MIN_RECEIVE_RADIUS_M - coarse.covering_radius_m
+        points = coarse.points
+        inside = np.hypot(points[:, 0], points[:, 1]) <= TARGET_RADIUS_M + 1e-9
+        candidates = points[inside]
+        position = np.asarray(self.position, dtype=float)
+
+        def gains_against(remaining_mask):
+            """每个候选站位对给定粗格网残余的新增排除格点数（分块计算）。"""
+            remaining_points = points[remaining_mask]
+            result = np.zeros(len(candidates))
+            for start in range(0, len(candidates), 512):
+                block = candidates[start:start + 512]
+                if len(remaining_points):
+                    distances = np.linalg.norm(
+                        remaining_points[None, :, :] - block[:, None, :], axis=2)
+                    result[start:start + 512] = np.count_nonzero(
+                        distances <= reach_radius, axis=1)
+            return result
+
+        def pick_station(remaining_mask, origin):
+            """近优增益集中取离 origin 最近者；无正增益时返回 None。"""
+            gains = gains_against(remaining_mask)
+            if not np.any(gains > 0):
+                return None
+            good = np.flatnonzero(gains >= self.config.adaptive_cert_good_ratio * float(gains.max()))
+            travels = np.linalg.norm(candidates[good] - origin, axis=1)
+            return candidates[good[int(np.argmin(travels))]]
+
+        waypoint = pick_station(pending, position)
+        if waypoint is None:
+            return None
+        measures = [channel for channel in active
+                    if self._station_is_new(channel, waypoint)
+                    and self._search_gain(channel, waypoint) > 0.0]
+        if not measures:
+            return None
+        # 贪心覆盖链估计：假设此后全部无信号，逐站就地选站直至残余清空。
+        # 首站的真实代价已计入 total_s；循环只为后续各站补计行进与测量。
+        total_s = self._travel_s(waypoint) + self._measure_cost_s(measures)
+        simulated = {channel: self.channels[channel].plan_mask.copy() for channel in active}
+        remaining = pending.copy()
+        origin = waypoint
+        for _ in range(max(1, self.config.adaptive_cert_max_chain_stations)):
+            cover = (np.linalg.norm(points - origin, axis=1) <= reach_radius)
+            for channel in active:
+                simulated[channel] &= ~cover
+            remaining &= ~cover
+            if not np.any(remaining):
+                break
+            nxt = pick_station(remaining, origin)
+            if nxt is None:
+                break
+            cover_nxt = (np.linalg.norm(points - nxt, axis=1) <= reach_radius)
+            nxt_measures = sum(1 for channel in active
+                               if np.any(simulated[channel] & cover_nxt))
+            total_s += float(np.linalg.norm(nxt - origin)) / ROBOT_SPEED_MPS
+            total_s += (MEASURE_TIME_S + CHANNEL_SWITCH_TIME_S) * nxt_measures
+            origin = nxt
+        return StopPlan('adaptive_cert', np.asarray(waypoint, dtype=float), measures,
+                        self._travel_m(waypoint), score_s=total_s,
+                        note='自适应证书收尾：残余格点就地选站')
 
     def _route_aware_endgame_plan(self, dynamic_plan=None):
         """在无信号情景下估计完整补证路线，并返回预计总代价最小的首站。

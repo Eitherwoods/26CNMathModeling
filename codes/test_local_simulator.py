@@ -59,7 +59,7 @@ class GeneratePracticeTests(unittest.TestCase):
         self.assertTrue(set(chans) <= set(range(1, 21)))
         for j in scenario["jammers"]:
             x, y, r = j["x_um"], j["y_um"], j["max_receive_um"]
-            self.assertTrue(x * x + y * y <= 1_770_000_000 ** 2)
+            self.assertTrue(x * x + y * y <= 1_800_000_000 ** 2)
             self.assertTrue(1_000_000_000 <= r <= 1_500_000_000)
             if problem == 3:
                 self.assertEqual(j["kind"], "omni")

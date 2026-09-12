@@ -57,13 +57,23 @@ PROBLEM4_LATTICE_SPACING_M = 20.0
 PROBLEM4_SEARCH_SPACING_M = 900.0
 PROBLEM4_ORIENTATION_BINS = 24
 PROBLEM4_RADIUS_BINS = 4
+# 2026-09-13 深夜曾采纳 96，后经顺序单线程（OMP_NUM_THREADS=1）干净对照证伪：
+# pair-only 与 pair+hyp96+fair96 在确定性口径下逐位相同（24 种子均 662.0），
+# 此前的"-4.7%"是并行批量基准的线程/负载伪影。维持 64。
 PROBLEM4_HYPOTHESIS_LIMIT = 64
-PROBLEM4_SEARCH_INTERVAL = 4
-# 已发现目标的处理是有限过程，连续完成后再恢复全域覆盖，减少跨区折返。
-PROBLEM4_FINISH_DETECTED_BEFORE_SEARCH = True
+# 2026-09-13 采纳 search_interval 4→1 与 FINISH_DETECT True→False 的**成对组合**
+# （本地官方同构 Engine 24 种子 732.6→696.6，留出 13-24 761.9→712.4）。
+# 注意两项单独启用均无效甚至变差（interval=1 单独 = 基线；finish=False 单独
+# = +11.7%），只有"搜索每轮可插空 + 追踪不再独占调度"的组合才成立，勿拆开回退。
+PROBLEM4_SEARCH_INTERVAL = 1
+# 已发现目标的处理是有限过程；2026-09-13 起与 search_interval=1 成对改为 False
+# （证据见上），追踪与全域覆盖搜索按轮交错，跨区折返更少。
+PROBLEM4_FINISH_DETECTED_BEFORE_SEARCH = False
 # 离线 11 案例扫档中 2 轮优于 1、3、4、8 轮；达到上限后仍由有限后备清除
 # 保证完成，因此这里只压缩启发式追踪，不改变清除证书和结束判据。
 PROBLEM4_TRACKING_LIMIT = 2
+# 2026-09-13 深夜曾采纳 96，与 HYPOTHESIS_LIMIT 一同被确定性对照证伪（见上），
+# 维持 192。
 PROBLEM4_FAIRNESS_AGE_ROUNDS = 192
 # 自适应追踪轮数（2026-09-12 新方法）：按存活位置单元数缩放有效追踪上限——
 # 单元很少的频道直接走后备清除（链短且每步便宜），单元很多的频道额外追加
@@ -72,7 +82,9 @@ PROBLEM4_ADAPTIVE_UNITS_LOW = 12
 PROBLEM4_ADAPTIVE_UNITS_HIGH = 25
 PROBLEM4_ADAPTIVE_EXTRA_ROUNDS = 2
 PROBLEM4_MAX_ROUNDS = 10000
-PROBLEM4_INFO_THRESHOLD = 0.004
+# 已发现频道的原地补测只在信息收益足以覆盖动作开销时执行；本地12例
+# 配对复核将阈值从0.004调至0.07，减少低收益补测并保持100%完成。
+PROBLEM4_INFO_THRESHOLD = 0.07
 PROBLEM4_EXIT_RESERVE_S = 15.0
 PROBLEM4_STEP_LENGTHS_M = (100.0, 250.0, 600.0, 1000.0)
 # 搜索停靠点选法：'greedy'=最近未覆盖顶点；'tour'=预排 Hamilton 路次序。
@@ -81,7 +93,14 @@ PROBLEM4_SEARCH_ROUTE = 'greedy'
 # 搜索布站设计：'triangular'=边长900三角格外扩一格（37点，解析构造）；
 # 'optimized'=启发式布站优化（贪心删点+模拟退火，顶点更少，两项几何证书
 # 由单元测试按密采样复核）。顶点数是每个待排除频道动作数的下限。
-PROBLEM4_SEARCH_LAYOUT = 'optimized'
+PROBLEM4_SEARCH_LAYOUT = 'rings'
+# 同心环布站（2026-09-13 采纳，本地官方同构 Engine 24 种子 662.0→615.5 s/源，
+# 且方向位图证书 38 洞→0 洞，严格性同时提高）。外环 12 点/1900 m 是几何地板
+# （边界点覆盖顶点必在 ±33.2° 楔形内且方位空隙 ≤180°），不要减到 11 点以下。
+PROBLEM4_RING_INNER = (800.0, 6)
+PROBLEM4_RING_MIDDLE = (1600.0, 11)
+PROBLEM4_RING_OUTER = (1900.0, 12)
+PROBLEM4_RING_OFFSET_DEG = 0.0
 
 # 数值精度
 DISTANCE_TOL = 1e-7
