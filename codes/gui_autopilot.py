@@ -403,6 +403,23 @@ def post_run_txt(problem: int, run_stdout: str) -> Path | None:
         return None
 
 
+def _resolve_record_path(problem: int, raw_path: str) -> Path | None:
+    """解析运行器返回的记录路径；编码失配时回退到该题最新任务记录。"""
+    candidate = Path(raw_path)
+    if candidate.exists():
+        return candidate
+    record_dir = PROJECT_ROOT / f"output/Problem{problem}"
+    candidates = sorted(
+        record_dir.glob(f"mission_p{problem}_*.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if candidates:
+        print(f"[autopilot] record_path 编码失配，回退到最新记录: {candidates[0]}")
+        return candidates[0]
+    return None
+
+
 def _post_run_txt(problem: int, run_stdout: str) -> Path | None:
     from codes.record_to_txt import convert
 
@@ -410,7 +427,10 @@ def _post_run_txt(problem: int, run_stdout: str) -> Path | None:
     if not match:
         print("[autopilot] 未从输出解析到 record_path，跳过 TXT 生成")
         return None
-    record = Path(match.group(1))
+    record = _resolve_record_path(problem, match.group(1))
+    if record is None:
+        print("[autopilot] 记录文件不存在，跳过 TXT 生成")
+        return None
     line = (TESTER_DIR / f"runq{problem}.txt").read_text(encoding="utf-8").strip()
     tokens = line.split()
     jsonl = None

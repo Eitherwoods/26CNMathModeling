@@ -41,9 +41,20 @@ python -m unittest codes.test_problem2 -v
 
 结果写入 `output/Problem2/problem2_results.json`，候选区域图写入 `figures/Problem2/`。
 
-### 问题三 / 问题四：本地正确性自检（只做这一步，然后直接上演练）
+### 问题三 / 问题四：本地自检与本地训练，然后上演练
 
-**测试策略（2026-09-12 起）**：性能与参数评价一律以**服务器"演练模式"实测为准**；本地只保留下面两套单元测试验证代码正确性，通过后直接跑线上演练，不再做本地离线仿真、基准或扫档。历史离线测试记录已于 2026-09-12 彻底删除，`offline-*`、`test-*.jsonl` 等本地测试产物已加入 `.gitignore`，不再入库。
+**测试策略（2026-09-13 更新，两条轨道）**：
+
+1. **正确性轨道**：本地只保留下面两套单元测试验证代码正确性，通过后才允许上任何演练。
+2. **性能与调参轨道（2026-09-13 用户批准）**：允许使用本地逆向复刻模拟器
+   [codes/local_simulator.py](codes/local_simulator.py)（与官方演练模式同构，随机数、
+   场景生成、示向噪声、计费一致，见 [tester/READMElocal.md](tester/READMElocal.md)）
+   做训练、扫档与 A/B（`python -m codes.benchmark_q34_local ...`）。本地百分比只用于
+   筛选与归因，**最终性能验收与论文数据一律以服务器"演练模式"实测为准**。
+   正式测试仍只能由人工在模拟器界面触发，任何自动化不得触碰"正式测试"入口。
+
+历史离线桩测试记录已于 2026-09-12 彻底删除，`offline-*`、`test-*.jsonl` 等本地测试产物
+已加入 `.gitignore`，不再入库。
 
 ```powershell
 python -m unittest codes.test_problem3 -v
@@ -94,7 +105,7 @@ run_robot.py（入口，默认离线）
 协议层四个接口：`enter()`、`measure(x,y,channel)`、`clear(x,y,channel)`、`exit()`。
 算法通过 `context.measure/clear/state/should_stop()` 与模拟器交互，不自行发送 HTTP、不调用 enter/exit。接入方式与接口表详见 [codes/README.md](codes/README.md)。
 
-各问题测试文件：`test_problem1~4.py`、`test_protocol.py`（计时、丢包、拒绝、超时、边界与 HTTP 传输检查）、`test_strategy.py`；`benchmark_problem3/4.py` 等离线基准工具仅保留作排查，不再作为常规测试流程（见上文测试策略）。
+各问题测试文件：`test_problem1~4.py`、`test_protocol.py`（计时、丢包、拒绝、超时、边界与 HTTP 传输检查）、`test_strategy.py`；性能调参用 `codes.benchmark_q34_local`（本地复刻模拟器，见上文测试策略），`benchmark_problem3/4.py` 等离线桩基准仅保留作排查。
 
 ## 文档索引
 

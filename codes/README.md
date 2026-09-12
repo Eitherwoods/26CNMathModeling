@@ -4,16 +4,19 @@
 实现问题一、二几何求解，以及 HTTP 协议封装、离线响应与状态机验证，并提供后续问题3/4算法接入入口。
 Python 3.9+，无第三方依赖。
 
-## 测试策略（2026-09-12 起，用户指定）
+## 测试策略（2026-09-13 更新，两条轨道）
 
-- **性能与参数评价一律以服务器"演练模式"实测为准**（`--mode practice` 或 `gui_autopilot` 全自动）；
-  不在本地做离线仿真、基准或扫档。
-- 本地只保留**正确性单元测试**两套：`python -m unittest codes.test_problem3 -v`、
+- **正确性轨道**：本地只保留**正确性单元测试**两套：`python -m unittest codes.test_problem3 -v`、
   `python -m unittest codes.test_problem4 -v`（协议层另保留 `codes.test_protocol`）。
-  测试通过即直接跑线上演练。
-- 离线桩（`offline_stub.py`）降级为协议测试替身，仅服务单元测试与接入冒烟；
-  其 CLI 仿真与 `benchmark_*` 工具仅作故障排查。历史离线测试记录已于 2026-09-12 彻底删除，
-  `offline-*`、`test-*.jsonl` 等本地测试产物已加入 `.gitignore`，不再入库。
+  测试通过才允许上任何演练。
+- **性能与调参轨道（2026-09-13 用户批准）**：允许使用本地逆向复刻模拟器
+  `codes/local_simulator.py`（与官方演练模式同构）与 `codes.benchmark_q34_local`
+  做训练、扫档与 A/B，见 `tester/READMElocal.md`。本地百分比只用于筛选与归因，
+  **最终性能验收与论文数据一律以服务器"演练模式"实测为准**（`--mode practice` 或
+  `gui_autopilot` 全自动）。正式测试只能由人工在界面触发。
+- 离线桩（`offline_stub.py`）仍是协议测试替身，仅服务单元测试与接入冒烟；
+  其 CLI 仿真与 `benchmark_problem3/4` 等离线桩工具仅作故障排查。历史离线测试记录已于
+  2026-09-12 彻底删除，`offline-*`、`test-*.jsonl` 等本地测试产物已加入 `.gitignore`，不再入库。
 
 ## 运行
 
