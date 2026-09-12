@@ -82,9 +82,9 @@ PROBLEM4_ADAPTIVE_UNITS_LOW = 12
 PROBLEM4_ADAPTIVE_UNITS_HIGH = 25
 PROBLEM4_ADAPTIVE_EXTRA_ROUNDS = 2
 PROBLEM4_MAX_ROUNDS = 10000
-# 已发现频道的原地补测只在信息收益足以覆盖动作开销时执行；本地12例
-# 配对复核将阈值从0.004调至0.07，减少低收益补测并保持100%完成。
-PROBLEM4_INFO_THRESHOLD = 0.07
+# 已发现频道的原地补测只在信息收益足以覆盖动作开销时执行；环形布站下
+# 单线程 24 种子对照将阈值由0.07调至0.09，仍保持24/24完成并再降约1.0 s/源。
+PROBLEM4_INFO_THRESHOLD = 0.09
 PROBLEM4_EXIT_RESERVE_S = 15.0
 PROBLEM4_STEP_LENGTHS_M = (100.0, 250.0, 600.0, 1000.0)
 # 搜索停靠点选法：'greedy'=最近未覆盖顶点；'tour'=预排 Hamilton 路次序。

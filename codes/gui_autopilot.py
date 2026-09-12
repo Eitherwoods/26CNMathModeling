@@ -273,10 +273,19 @@ def wait_interface_ready(win, audit: Audit, timeout: float = 180.0) -> str:
     raise AutopilotError(f"{timeout:.0f}s 内接口未就绪，请人工查看模拟器界面")
 
 
+def _first_command_line(cmd_file: Path) -> str:
+    """取演练命令文件中第一条非空、非注释（# 开头）的行。"""
+    for raw in cmd_file.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            return line
+    raise AutopilotError(f"{cmd_file.name} 中没有可执行的演练命令")
+
+
 def build_run_command(problem: int) -> list[str]:
     """读取演练命令并按参数令牌严格校验，拒绝题号或模式混淆。"""
     cmd_file = TESTER_DIR / f"runq{problem}.txt"
-    line = cmd_file.read_text(encoding="utf-8").strip()
+    line = _first_command_line(cmd_file)
     tokens = line.split()
     mode_positions = [i for i, token in enumerate(tokens) if token == "--mode"]
     problem_positions = [i for i, token in enumerate(tokens) if token == "--problem"]
@@ -481,8 +490,9 @@ def cmd_run(args):
 def back_to_drill_list(win, audit: Audit, problem: int):
     """从会话结束页回到演练列表页，确保「开始问题N演练测试」按钮可见。"""
     target = drill_button_name(problem)
-    for attempt in range(4):
+    for attempt in range(10):
         win = attach(wait_s=10)
+        _poke_accessibility(win.handle)
         buttons = [el for el in all_controls(win)
                    if el.element_info.control_type == "Button"
                    and el.element_info.name == target]
@@ -503,7 +513,7 @@ def back_to_drill_list(win, audit: Audit, problem: int):
             if clicked:
                 break
         audit.step(win, f"back-to-list-{attempt}", {"clicked": clicked})
-        time.sleep(2.5)
+        time.sleep(3.5)
     raise AutopilotError("无法回到演练列表页（找不到 " + target + "）")
 
 
