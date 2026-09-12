@@ -38,6 +38,8 @@ python -m unittest codes.test_problem2 -v
 - `test_problem2.py`：问题二角度、近距离、可靠性裕量与端到端验证。
 - `problem3_model.py`：问题三可能位置集合的栅格表示、保守更新算子、单频道判据与覆盖布站。
 - `problem3_solution.py`：问题三五项决策策略、统计汇总与离线命令行入口。
+- `problem3_belief.py`：问题三贝叶斯置信图层（Koopman 排序与下注层，`belief_enabled` 开启，见 `solutions/problem3_flow.md` §12）。
+- `test_problem3_belief.py`：置信层归一性、支持集一致性、下注判据与端到端测试。
 - `strategy_p3.py`：问题三运行器入口适配（导出 `solve`）。
 - `scenario.py`：离线演练案例生成（随机/固定），不是官方案例分布。
 - `problem3_plotting.py`：问题三任务图（轨迹、可能区域收敛、动作时间构成）。

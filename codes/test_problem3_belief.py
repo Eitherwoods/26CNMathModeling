@@ -61,10 +61,14 @@ class BeliefConstructionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Problem3Config(belief_clear_max_distance_m=-1.0)
 
-    def test_belief_disabled_creates_no_layer(self):
-        strategy = Problem3Strategy(_DummyContext(),
-                                    Problem3Config(belief_enabled=False))
-        self.assertIsNone(strategy.beliefs)
+    def test_belief_disabled_by_default_and_enabled_by_flag(self):
+        # 默认关闭（离线扫档未达采纳标准，见 Problem3Config 注释）；
+        # 显式开启时按频道建层。
+        disabled = Problem3Strategy(_DummyContext())
+        self.assertIsNone(disabled.beliefs)
+        enabled = Problem3Strategy(_DummyContext(), Problem3Config(belief_enabled=True))
+        self.assertIsNotNone(enabled.beliefs)
+        self.assertEqual(set(enabled.beliefs), set(enabled.channels))
 
 
 class BeliefUpdateTests(unittest.TestCase):
@@ -139,7 +143,8 @@ class StrategyWiringTests(unittest.TestCase):
     """置信层与策略决策4/2/1 的接线。"""
 
     def setUp(self):
-        self.strategy = Problem3Strategy(_DummyContext())
+        self.strategy = Problem3Strategy(_DummyContext(),
+                                         Problem3Config(belief_enabled=True))
 
     def test_default_config_enables_layer(self):
         self.assertIsNotNone(self.strategy.beliefs)
@@ -233,7 +238,7 @@ class EndToEndBeliefTests(unittest.TestCase):
     """离线桩端到端：置信层开启时任务仍须完整、合法地结束。"""
 
     def test_small_mission_completes_with_belief_layer(self):
-        case = run_case(3, seed=11, sources=3, overrides={})
+        case = run_case(3, seed=11, sources=3, overrides={'belief_enabled': True})
         self.assertTrue(case['checks']['all_constraints_ok'],
                         msg=f"checks={case['checks']} error={case['error']}")
         self.assertEqual(case['cleared'], case['true_total'])
