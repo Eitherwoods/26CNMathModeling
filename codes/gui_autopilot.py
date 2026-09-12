@@ -18,7 +18,7 @@ Chrome_RenderWidgetHostHWND 发 WM_GETOBJECT(OBJID_CLIENT) 激活，才能看到
   python -m codes.gui_autopilot drill --problem 4   # 登录(如需)+启动演练+等接口就绪
   python -m codes.gui_autopilot run --problem 4     # 跑 run_robot practice 命令
   python -m codes.gui_autopilot full --problem 4    # 全流程（drill + run）
-审计产物（步骤截图）进 output/gui_audit/。
+步骤审计只输出文字日志，不生成截图。
 """
 
 from __future__ import annotations
@@ -33,12 +33,10 @@ import time
 import win32gui
 from pathlib import Path
 
-from PIL import ImageGrab
 from pywinauto import Desktop
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TESTER_DIR = PROJECT_ROOT / "tester"
-AUDIT_DIR = PROJECT_ROOT / "output" / "gui_audit"
 CREDENTIALS = TESTER_DIR / "username-and-password.txt"
 SIM_EXE = TESTER_DIR / "jammers-simulator.exe"
 
@@ -118,19 +116,11 @@ def attach(wait_s: float = 60.0):
 
 class Audit:
     def __init__(self):
-        AUDIT_DIR.mkdir(parents=True, exist_ok=True)
-        self.stem = f"audit-{time.strftime('%Y%m%d-%H%M%S')}"
         self._n = 0
 
     def step(self, win, name: str, detail: dict | None = None):
         self._n += 1
-        shot = AUDIT_DIR / f"{self.stem}-{self._n:02d}-{name}.png"
-        try:
-            ImageGrab.grab().save(shot)  # 全屏快照，足以核对点击前后状态
-        except Exception:
-            shot = None
-        print(f"[审计 {self._n:02d}] {name} {detail or ''}"
-              + (f" （截图 {shot.name}）" if shot else ""))
+        print(f"[审计 {self._n:02d}] {name} {detail or ''}")
 
 
 # ---------------------------------------------------------------- 凭据
