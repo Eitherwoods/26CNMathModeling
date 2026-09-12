@@ -29,7 +29,7 @@ from dataclasses import asdict, dataclass, field, replace
 import numpy as np
 
 from . import config as settings
-from .base_models import bearing_deg
+from .base_models import bearing_deg, open_route_order, adaptive_directions, bounded_candidates
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
                      MAX_SOURCE_COUNT, MIN_SOURCE_COUNT,
@@ -57,9 +57,12 @@ class Problem3Config:
     # 使追击顺路与补证巡航的每站信息量更高）。
     candidate_layout: str = 'hybrid15'
     lookahead_directions: int = 24
+    adaptive_initial_direction: bool = False
+    tracking_path_limit_m: float = 0.0
     lookahead_lengths_m: tuple = (250.0, 500.0, 900.0)
     lookahead_hypotheses: int = 15
     chase_options_limit: int = 4
+    allocation_by_region: bool = False
     local_lookahead_limit_m: float = 500.0
     approach_direct_m: float = 400.0
     # 追踪途中已经支付了移动代价，多测几个有价值频道通常比日后专程折返更省时。
@@ -91,6 +94,7 @@ class Problem3Config:
     # 对访问顺序做 2-opt（站点集合与各站检测频道不变，覆盖结果不变），
     # 取改进后与原序列的较小总耗时。
     absence_route_2opt: bool = False
+    rolling_search_route: bool = False
     # 承诺式补证游（默认关闭；开启时通常连同 absence_route_2opt）：把 2-opt
     # 改进后的完整路线缓存并按序执行，期间任何示向/近场读数（出现新发现）
     # 立即作废该路线。只改"估计与执行一致"，不改覆盖站点集合与证书。
@@ -108,6 +112,14 @@ class Problem3Config:
     # 交给 MPC 收尾（不中途打断）。
     route_handoff_detected: bool = False
     route_max_nodes: int = 0
+    # 折返抑制（默认关闭，单位秒）：候选停靠点的方位与"上一段实际移动方位"夹角超过
+    # `turn_penalty_angle_deg` 时，在其评分上加惩罚。动机：MPC 每轮贪心选点会在两个
+    # 方向相反的目标之间来回切换——n12 案例实测出现 500 m 去 + 500 m 回的 A→B→A
+    # 折返，且 98.7% 的移动落在被穿越 ≥3 次的 300 m 方格上。
+    # 只作用于需要长距离移动的选项（`turn_penalty_min_leg_m` 以上），短距微调不受影响。
+    turn_penalty_s: float = 0.0
+    turn_penalty_angle_deg: float = 135.0
+    turn_penalty_min_leg_m: float = 200.0
     speculative_clear_m: float = 45.0
     speculative_min_probability: float = 0.30
     real_time_reserve_s: float = 15.0
@@ -147,6 +159,24 @@ class Problem3Config:
     # 2026-09-11 扫档：800 m 在 8 案例基准上最稳（−6% 左右）。
     intermediate_stop_gap_m: float = 800.0
     intermediate_stop_min_gain_m2: float = 2.0e5
+
+    def __post_init__(self):
+        """在构造格网或执行动作之前拒绝不稳定的搜索参数。"""
+        for name in ('lattice_spacing_m', 'planning_spacing_m', 'candidate_spacing_m', 'candidate_radius_m'):
+            value = getattr(self, name)
+            if not np.isfinite(value) or value <= 0:
+                raise ValueError(f'{name} 必须为有限正数。')
+        for name in ('lookahead_directions', 'lookahead_hypotheses', 'chase_options_limit', 'max_rounds'):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f'{name} 必须为正整数。')
+        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region'):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f'{name} 必须为布尔值。')
+        if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
+            raise ValueError('追踪路径限制必须非负且有限。')
+        if not self.lookahead_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.lookahead_lengths_m):
+            raise ValueError('前瞻步长必须为非空的有限正数序列。')
 
 
 @dataclass
@@ -206,6 +236,8 @@ class Problem3Strategy:
         self.channel_series = {channel: [] for channel in self.channels}
         self.moved_distance_m = 0.0
         self.planner_errors = 0
+        # 上一段"实际发生位移"的移动方位（度）；仅用于折返抑制，不参与任何严格结论。
+        self.last_move_bearing_deg = None
         self.stop_reason = 'running'
         self._started_at = time.monotonic()
         self._reach_cache: dict = {}
@@ -349,7 +381,15 @@ class Problem3Strategy:
             if limit is None:
                 continue
             detected.append((limit, channel))
-        detected.sort()
+        if self.config.allocation_by_region:
+            def region_cost(item):
+                """按接近区域和剩余定位规模分配，严格判据仍用原距离上界。"""
+                limit, channel = item
+                center, radius = self.channels[channel].region_estimate(use_fine=True)
+                return (limit if center is None else self._travel_m(center) + radius * 0.25, channel)
+            detected.sort(key=region_cost)
+        else:
+            detected.sort()
         options = []
         for limit, channel in detected[:self.config.chase_options_limit]:
             knowledge = self.channels[channel]
@@ -476,14 +516,16 @@ class Problem3Strategy:
             return None
         step = min(limit, self.config.approach_direct_m)
         angles = np.arange(8) * 45.0
+        local_directions = (adaptive_directions(self.position, center, 8)
+                            if self.config.adaptive_initial_direction else
+                            np.column_stack((np.cos(np.deg2rad(angles)), np.sin(np.deg2rad(angles)))))
         candidates = [np.asarray(center, dtype=float)]
         for scale in (0.5, 1.0):
-            for angle in angles:
-                direction = np.array([np.cos(np.deg2rad(angle)), np.sin(np.deg2rad(angle))])
+            for direction in local_directions:
                 candidates.append(np.array(self.position) + scale * step * direction)
         candidates.append(np.array(center, dtype=float) + np.array([radius, 0.0]))
         best, best_score = None, float('inf')
-        for waypoint in candidates:
+        for waypoint in bounded_candidates(candidates, self.position, self.config.tracking_path_limit_m):
             if not self._station_is_new(knowledge.channel, waypoint):
                 continue
             penalty = 0.0
@@ -529,9 +571,14 @@ class Problem3Strategy:
         hypotheses = points[::step][:self.config.lookahead_hypotheses]
         angles = np.arange(self.config.lookahead_directions) * (360.0 / self.config.lookahead_directions)
         directions = np.column_stack((np.cos(np.deg2rad(angles)), np.sin(np.deg2rad(angles))))
+        if self.config.adaptive_initial_direction:
+            center = (points.min(axis=0) + points.max(axis=0)) / 2
+            directions = adaptive_directions(self.position, center, self.config.lookahead_directions)
         scored = []
         best, best_score = None, float('inf')
         for length in self.config.lookahead_lengths_m:
+            if self.config.tracking_path_limit_m and length > self.config.tracking_path_limit_m:
+                continue
             for direction in directions:
                 waypoint = np.array(self.position) + length * direction
                 if np.hypot(*waypoint) > self.config.candidate_radius_m + 900.0:
@@ -840,6 +887,10 @@ class Problem3Strategy:
 
     def _two_opt_order(self, visit_sequence):
         """返回 2-opt 改进后的访问顺序（不重算时间，只重排索引）。"""
+        if self.config.rolling_search_route:
+            order = open_route_order([point for point, _ in visit_sequence],
+                                     self.position, list(range(len(visit_sequence))))
+            return [visit_sequence[index] for index in order]
         start = np.asarray(self.position, dtype=float)
         points = [np.asarray(waypoint, dtype=float) for waypoint, _ in visit_sequence]
         count = len(points)
@@ -1243,6 +1294,7 @@ class Problem3Strategy:
         options = [plan for plan in options if np.isfinite(plan.score_s)]
         if not options:
             return None
+        options = self._apply_turn_penalty(options)
         # 自适应评分不得无限推迟保证性任务：等待达到上限的追踪频道强制服务。
         due_tracking = [
             plan for plan in options
@@ -1261,6 +1313,35 @@ class Problem3Strategy:
         # 若最优计划需要长距离移动，检查直线路径上是否有高价值中间停靠点。
         intermediate = self._maybe_intermediate_plan(best)
         return intermediate if intermediate is not None else best
+
+    def _apply_turn_penalty(self, options):
+        """折返抑制：给与上一段移动方向相反的长距离选项加评分惩罚。
+
+        判据只用"已实际发生的移动方位"与"候选点方位"的夹角，不引入任何预测或
+        分布假设；因此它只改变选项之间的排序，不影响覆盖证书、清除判据或结束条件。
+        `turn_penalty_s <= 0`（默认）时原样返回，行为与历史版本完全一致。
+        """
+        penalty_s = float(self.config.turn_penalty_s)
+        if penalty_s <= 0.0 or self.last_move_bearing_deg is None:
+            return options
+        threshold = float(self.config.turn_penalty_angle_deg)
+        min_leg = float(self.config.turn_penalty_min_leg_m)
+        adjusted = []
+        for plan in options:
+            leg = self._travel_m(plan.waypoint)
+            if leg < min_leg:
+                adjusted.append(plan)
+                continue
+            bearing = float(np.degrees(np.arctan2(
+                plan.waypoint[1] - self.position[1],
+                plan.waypoint[0] - self.position[0])))
+            delta = abs((bearing - self.last_move_bearing_deg + 180.0) % 360.0 - 180.0)
+            if delta >= threshold:
+                adjusted.append(replace(plan, score_s=plan.score_s + penalty_s,
+                                        note=f'{plan.note} [折返{delta:.0f}°]'.strip()))
+            else:
+                adjusted.append(plan)
+        return adjusted
 
     def _maybe_intermediate_plan(self, plan):
         """当计划移动距离较长时，在直线路径上采样中间点并择优停靠。
@@ -1318,6 +1399,15 @@ class Problem3Strategy:
 
     # --------------------------------------------------------- 决策3/4：执行
 
+    def _check_action_budget(self, waypoint, kind, channel):
+        """与问题四一致，发令前计入移动及动作总耗时，禁止跨越虚拟时限。"""
+        state = self.context.state
+        limit = getattr(state, 'max_virtual_duration_s', settings.VIRTUAL_BUDGET_S)
+        action_s = (MEASURE_TIME_S + CHANNEL_SWITCH_TIME_S * (channel != self.current_channel)
+                    if kind == 'measure' else settings.OPTICAL_TIME_S + CLEAR_TIME_S)
+        if state.virtual_time_s + self._travel_s(waypoint) + action_s >= limit:
+            raise BudgetReached('问题三本次动作将耗尽虚拟时间预算。')
+
     def _execute_measures(self, plan):
         acted = False
         x, y = float(plan.waypoint[0]), float(plan.waypoint[1])
@@ -1326,6 +1416,7 @@ class Problem3Strategy:
                 break
             if not self._station_is_new(channel, plan.waypoint):
                 continue
+            self._check_action_budget(plan.waypoint, 'measure', channel)
             response = self.context.measure(x, y, channel)
             guaranteed_upper = (
                 plan.guaranteed_upper_m
@@ -1382,6 +1473,7 @@ class Problem3Strategy:
         for channel in self._clear_candidates(waypoint):
             if self.context.should_stop():
                 break
+            self._check_action_budget(waypoint, 'clear', channel)
             response = self.context.clear(x, y, channel)
             self._apply_clear(channel, waypoint, response)
             acted = True
@@ -1432,8 +1524,13 @@ class Problem3Strategy:
 
     def _move_to(self, waypoint):
         waypoint = (float(waypoint[0]), float(waypoint[1]))
-        self.moved_distance_m += float(np.hypot(waypoint[0] - self.position[0],
-                                                waypoint[1] - self.position[1]))
+        delta_x = waypoint[0] - self.position[0]
+        delta_y = waypoint[1] - self.position[1]
+        leg = float(np.hypot(delta_x, delta_y))
+        if leg > 1e-6:
+            # 记录真实发生的移动方位，供折返抑制使用（静止动作不更新）。
+            self.last_move_bearing_deg = float(np.degrees(np.arctan2(delta_y, delta_x)))
+        self.moved_distance_m += leg
         self.position = waypoint
         self.trajectory.append(waypoint)
 

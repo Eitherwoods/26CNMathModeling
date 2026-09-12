@@ -18,11 +18,13 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
+from .base_models import open_route_order, adaptive_directions, bounded_candidates
+
 from . import config as settings
 from .problem3_model import Lattice
 from .problem3_solution import summarize as summarize_base
-from .problem4_model import (Problem4Knowledge, ordered_search_route,
-                             triangular_search_waypoints)
+from .problem4_model import (Problem4Knowledge, optimized_search_waypoints,
+                             ordered_search_route, triangular_search_waypoints)
 from .strategy import BudgetReached
 
 
@@ -32,6 +34,7 @@ class Problem4Config:
 
     lattice_spacing_m: float = settings.PROBLEM4_LATTICE_SPACING_M
     search_spacing_m: float = settings.PROBLEM4_SEARCH_SPACING_M
+    search_layout: str = settings.PROBLEM4_SEARCH_LAYOUT
     orientation_bins: int = settings.PROBLEM4_ORIENTATION_BINS
     radius_bins: int = settings.PROBLEM4_RADIUS_BINS
     hypothesis_limit: int = settings.PROBLEM4_HYPOTHESIS_LIMIT
@@ -44,12 +47,52 @@ class Problem4Config:
     exit_reserve_s: float = settings.PROBLEM4_EXIT_RESERVE_S
     step_lengths_m: tuple = settings.PROBLEM4_STEP_LENGTHS_M
     search_route: str = settings.PROBLEM4_SEARCH_ROUTE
+    rolling_search_route: bool = False
+    rolling_route_min_clears: int = 0
+    adaptive_initial_direction: bool = False
+    tracking_path_limit_m: float = 0.0
+    allocation_by_region: bool = False
+    opportunistic_search: bool = False
+    tracking_travel_weight: float = 0.0
+    adaptive_search_evidence: bool = False
+    # 区域中心选法：'bbox'=外包盒中心；'mec'=最小包围圆近似中心（候选点，
+    # 可靠清除仍由全体单元距离判据把关）。追踪候选可附加定距接近环；
+    # 后备清除停靠时可选择性顺带测量已发现频道。
+    clear_center_mode: str = 'bbox'
+    approach_ring_m: tuple = ()
+    measure_during_fallback: bool = False
+    # 自适应追踪轮数：按存活位置单元数缩放有效追踪上限。单元很少的频道
+    # 后备链极短（每步约3s+短距移动），不值得再花检测轮；单元很多时多给
+    # 轮数可整片收缩区域。0 表示关闭自适应。
+    shared_gain_weight_s: float = 60.0
+    shortlist_radius_factor: float = 1.05
+    adaptive_units_low: int = settings.PROBLEM4_ADAPTIVE_UNITS_LOW
+    adaptive_units_high: int = settings.PROBLEM4_ADAPTIVE_UNITS_HIGH
+    adaptive_extra_rounds: int = settings.PROBLEM4_ADAPTIVE_EXTRA_ROUNDS
+    # 追击候选二级评分权重：半径接近时按"移动秒数 − 权重×共享信息增益"排序；
+    # 权重越大越愿意为信息增益绕路。shortlist 半径因子控制"接近最优"的容差。
+    shared_gain_weight_s: float = 60.0
+    shortlist_radius_factor: float = 1.05
 
     def __post_init__(self):
         """在任何动作之前拒绝破坏几何保证或调度活性的参数。"""
+        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region',
+                     'opportunistic_search', 'adaptive_search_evidence'):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f'{name} 必须为布尔值。')
+        if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
+            raise ValueError('追踪路径限制必须非负且有限。')
+        if not np.isfinite(self.tracking_travel_weight) or self.tracking_travel_weight < 0:
+            raise ValueError('追踪移动权重必须非负且有限。')
+        if (isinstance(self.rolling_route_min_clears, bool)
+                or not isinstance(self.rolling_route_min_clears, int)
+                or not 0 <= self.rolling_route_min_clears <= settings.MAX_SOURCE_COUNT):
+            raise ValueError('路线优化启动阈值必须是0到16的整数。')
         if not (0 < self.lattice_spacing_m * np.sqrt(2) / 2 < settings.CLEAR_RADIUS_M):
             raise ValueError('位置单元覆盖半径必须严格小于20米。')
-        if not 0 < self.search_spacing_m <= settings.MIN_RECEIVE_RADIUS_M:
+        if self.search_layout not in ('triangular', 'optimized'):
+            raise ValueError("搜索布站只允许 'triangular' 或 'optimized'。")
+        if self.search_layout == 'triangular' and not 0 < self.search_spacing_m <= settings.MIN_RECEIVE_RADIUS_M:
             raise ValueError('搜索三角形边长必须在(0,1000]米内。')
         for value in (self.orientation_bins, self.radius_bins, self.hypothesis_limit,
                       self.search_interval, self.tracking_limit, self.fairness_age_rounds,
@@ -66,6 +109,20 @@ class Problem4Config:
             raise ValueError('连续追踪开关必须为布尔值。')
         if self.search_route not in ('greedy', 'tour'):
             raise ValueError("搜索路线只允许 'greedy' 或 'tour'。")
+        if self.clear_center_mode not in ('bbox', 'mec'):
+            raise ValueError("区域中心选法只允许 'bbox' 或 'mec'。")
+        if any(not np.isfinite(v) or v <= 0 for v in self.approach_ring_m):
+            raise ValueError('接近环距离必须为正的有限值。')
+        if not isinstance(self.measure_during_fallback, bool):
+            raise ValueError('后备停靠顺带测量开关必须为布尔值。')
+        for name in ('adaptive_units_low', 'adaptive_units_high', 'adaptive_extra_rounds'):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError('自适应追踪阈值必须为非负整数。')
+        if not np.isfinite(self.shared_gain_weight_s) or self.shared_gain_weight_s < 0:
+            raise ValueError('共享信息增益权重必须非负且有限。')
+        if not np.isfinite(self.shortlist_radius_factor) or self.shortlist_radius_factor < 1:
+            raise ValueError('shortlist 半径因子必须≥1且有限。')
 
 
 @dataclass
@@ -121,7 +178,9 @@ class Problem4Strategy:
         self.config = config or Problem4Config()
         self.started_at = time.monotonic()
         self.lattice = Lattice.build(self.config.lattice_spacing_m)
-        self.waypoints = triangular_search_waypoints(self.config.search_spacing_m)
+        self.waypoints = (triangular_search_waypoints(self.config.search_spacing_m)
+                          if self.config.search_layout == 'triangular'
+                          else optimized_search_waypoints())
         self.search_route_order = (ordered_search_route(self.waypoints, np.zeros(2))
                                    if self.config.search_route == 'tour' else None)
         self.channels = {c: Problem4Knowledge(c, self.lattice,
@@ -139,6 +198,12 @@ class Problem4Strategy:
         self.moved_distance_m = 0.0
         self.round = 0
         self.stop_reason = 'running'
+        self.search_evidence = None
+        self.search_masks = {}
+        if self.config.adaptive_search_evidence:
+            from .search_evidence import DirectionalCoverage
+            self.search_evidence = DirectionalCoverage(self.lattice)
+            self.search_masks = {c: self.search_evidence.new_mask() for c in self.channels}
 
     def _limited(self):
         """同时检查实际时限、协议状态和虚拟时限，预留正常退出时间。"""
@@ -175,7 +240,11 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
                       if any(i not in self.coverage[c] for c in unknown)]
         if not candidates:
             return None
-        if self.search_route_order is not None:
+        if (self.config.rolling_search_route and
+                sum(k.status == 'cleared' for k in self.channels.values()) >= self.config.rolling_route_min_clears):
+            order = open_route_order(self.waypoints[candidates], self.position)
+            index = candidates[order[0]]
+        elif self.search_route_order is not None:
             rank = {index: order for order, index in enumerate(self.search_route_order)}
             index = min(candidates, key=lambda i: rank[i])
         else:
@@ -184,7 +253,7 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
 
     def _tracking_candidates(self, knowledge):
         """生成接近、换侧、历史有效点凸包及失联缩步候选。"""
-        center, _ = knowledge.region_estimate()
+        center, _ = knowledge.region_estimate(self.config.clear_center_mode)
         if center is None:
             return []
         vector = center - self.position
@@ -198,20 +267,41 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         for distance in lengths:
             points.extend([self.position + distance * axis,
                            center + distance * normal, center - distance * normal])
+        if self.config.adaptive_initial_direction:
+            directions = adaptive_directions(self.position, center, 8)
+            for distance in lengths:
+                points.extend(self.position + distance * direction for direction in directions)
+        # 定距接近环：站在距区域中心 d 处朝向机器狗一侧，参考问题三的
+        # approach_direct_m——既不贴脸也不越界，减少过近/过远的无效读数。
+        for distance in self.config.approach_ring_m:
+            points.append(center + distance * axis)
         positive = [np.array([o.x, o.y]) for o in knowledge.observations
                     if o.result in ('direction', 'near')]
         if len(positive) >= 2:
             points.append(np.mean(positive, axis=0))
             points.extend((positive[-1] + p) / 2 for p in positive[:-1])
-        return [p for p in points if knowledge.measured_at(*p) is None]
+        return [p for p in bounded_candidates(points, self.position, self.config.tracking_path_limit_m)
+                if knowledge.measured_at(*p) is None]
+
+    def _tracking_limit_for(self, knowledge):
+        """按存活单元数缩放有效追踪上限；关闭自适应时返回配置值。"""
+        limit = self.config.tracking_limit
+        if self.config.adaptive_units_low or self.config.adaptive_units_high:
+            units = len(knowledge.possible_points())
+            if self.config.adaptive_units_low and units <= self.config.adaptive_units_low:
+                limit = 0
+            elif (self.config.adaptive_units_high
+                  and units >= self.config.adaptive_units_high):
+                limit = self.config.tracking_limit + self.config.adaptive_extra_rounds
+        return limit
 
     def _tracking_plan(self, channel):
         """先限定有限追踪轮数，再转入覆盖清除，防止失联后无限往返。"""
         knowledge = self.channels[channel]
-        center, _ = knowledge.region_estimate()
+        center, _ = knowledge.region_estimate(self.config.clear_center_mode)
         if center is not None and knowledge.certain_clear(*center) and not knowledge.cleared_here(*center):
             return StopPlan(center, 'reliable_clear', channel)
-        if self.track_counts[channel] >= self.config.tracking_limit:
+        if self.track_counts[channel] >= self._tracking_limit_for(knowledge):
             point = knowledge.fallback_point(self.position)
             return None if point is None else StopPlan(point, 'fallback_clear', channel)
         candidates = self._tracking_candidates(knowledge)
@@ -221,9 +311,13 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             return None if point is None else StopPlan(point, 'fallback_clear', channel)
         hypotheses = knowledge.planning_hypotheses(self.config.hypothesis_limit)
         scores = [(feedback_score(hypotheses, p), p) for p in candidates]
+        if self.config.tracking_travel_weight:
+            _, point = min(scores, key=lambda item: item[0][0] + self.config.tracking_travel_weight
+                           * float(np.linalg.norm(item[1] - self.position)))
+            return StopPlan(point, 'track', channel)
         best_radius = min(score[0] for score, _ in scores)
         shortlisted = [(score, p) for score, p in scores
-                       if score[0] <= best_radius * 1.05 + 1e-9]
+                       if score[0] <= best_radius * self.config.shortlist_radius_factor + 1e-9]
         # 半径接近时，以联合信息、移动代价区分；权重不解释为成功概率。
         shared_hypotheses = [self.channels[c].planning_hypotheses(self.config.hypothesis_limit)
                              for c in self._detected() if c != channel]
@@ -231,7 +325,8 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             """合并多个已发现频道的信息价值，移动成本仅计一次。"""
             score, point = item
             shared_gain = score[1] + sum(feedback_score(h, point)[1] for h in shared_hypotheses)
-            return np.linalg.norm(point - self.position) / settings.ROBOT_SPEED_MPS - 60 * shared_gain
+            return (np.linalg.norm(point - self.position) / settings.ROBOT_SPEED_MPS
+                    - self.config.shared_gain_weight_s * shared_gain)
         _, point = min(shortlisted, key=secondary_score)
         return StopPlan(point, 'track', channel)
 
@@ -243,7 +338,11 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         任何可行集或完成判据。
         """
         knowledge = self.channels[channel]
-        center, _ = knowledge.region_estimate()
+        if (self.config.allocation_by_region
+                and self.track_counts[channel] >= self._tracking_limit_for(knowledge)):
+            point = knowledge.fallback_point(self.position)
+            return float('inf') if point is None else float(np.linalg.norm(point - self.position))
+        center, _ = knowledge.region_estimate(self.config.clear_center_mode)
         if center is None:
             point = knowledge.fallback_point(self.position)
             return float('inf') if point is None else float(np.linalg.norm(point - self.position))
@@ -298,7 +397,8 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         if not candidates:
             return plan
         hypotheses = knowledge.planning_hypotheses(self.config.hypothesis_limit)
-        point = min(candidates, key=lambda p: (feedback_score(hypotheses, p)[0],
+        point = min(candidates, key=lambda p: (feedback_score(hypotheses, p)[0]
+                                               + self.config.tracking_travel_weight * float(np.linalg.norm(p - self.position)),
                                                float(np.linalg.norm(p - self.position))))
         return StopPlan(point, plan.kind, plan.channel)
 
@@ -331,8 +431,15 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             necessary = (plan.kind == 'initial' or
                          (plan.kind == 'search' and knowledge.status == 'unknown') or
                          (plan.kind == 'track' and channel == plan.channel))
+            if (self.config.opportunistic_search and knowledge.status == 'unknown'
+                    and plan.kind == 'track'):
+                # 已支付移动代价，只有与历史测点相隔足够远才安排未知频道检测。
+                necessary = all(np.linalg.norm(point - np.array([o.x, o.y])) >= 600.0
+                                for o in knowledge.observations)
             if not necessary:
-                if knowledge.status != 'detected' or plan.kind == 'fallback_clear':
+                if knowledge.status != 'detected':
+                    continue
+                if plan.kind == 'fallback_clear' and not self.config.measure_during_fallback:
                     continue
                 _, gain = feedback_score(knowledge.planning_hypotheses(self.config.hypothesis_limit), point)
                 cost = settings.MEASURE_TIME_S + (channel != self.current_channel)
@@ -343,6 +450,10 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
             self._commit_action(point, channel, 'measure', response)
             knowledge.observe(response['measure_result'], *point, bearing_deg=response.get('svd_deg'),
                               virtual_time_s=response['virtual_time_s'])
+            if self.search_evidence is not None and knowledge.status == 'unknown':
+                self.search_masks[channel] = self.search_evidence.update(self.search_masks[channel], point)
+                if not self.search_masks[channel].any():
+                    knowledge.status = 'excluded'
             series = self.channel_series[channel]
             limit = knowledge.max_distance_m(*point)
             series.append({'measure_count': len(series) + 1,

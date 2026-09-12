@@ -15,6 +15,81 @@ from scipy.optimize import linprog
 from .config import ANGLE_ERROR_DEG, DISTANCE_TOL, PARALLEL_TOL
 
 
+def bounded_candidates(points, position, max_leg_m=0.0):
+    """过滤非法坐标和超长试探路径，稳定去重；零长度限制表示关闭。"""
+    if not np.isfinite(max_leg_m) or max_leg_m < 0:
+        raise ValueError('路径长度限制必须非负且有限。')
+    position = np.asarray(position, dtype=float)
+    if position.shape != (2,) or not np.isfinite(position).all():
+        raise ValueError('路径起点必须是有限二维坐标。')
+    result, seen = [], set()
+    for point in points:
+        point = np.asarray(point, dtype=float)
+        if point.shape != (2,) or not np.isfinite(point).all() or np.any(np.abs(point) > 2_000_000):
+            continue
+        if max_leg_m and np.linalg.norm(point - position) > max_leg_m + 1e-9:
+            continue
+        key = tuple(np.round(point, 8))
+        if key not in seen:
+            result.append(point)
+            seen.add(key)
+    return result
+
+
+def adaptive_directions(position, center, count):
+    """以当前位置到可行域中心为初始方向，均匀旋转；重合时回退到东向。"""
+    position, center = np.asarray(position, dtype=float), np.asarray(center, dtype=float)
+    if (position.shape != (2,) or center.shape != (2,)
+            or not np.isfinite(position).all() or not np.isfinite(center).all()
+            or isinstance(count, bool) or not isinstance(count, int) or count < 1):
+        raise ValueError('方向初始化需要有限二维坐标和正整数方向数。')
+    delta = center - position
+    angle = np.arctan2(delta[1], delta[0]) if np.linalg.norm(delta) > 1e-9 else 0.0
+    angles = angle + np.arange(count) * (2 * np.pi / count)
+    return np.column_stack((np.cos(angles), np.sin(angles)))
+
+
+def open_route_order(points, start, order=None):
+    """确定性最近邻和开放路径2-opt；保留全部顶点，允许翻转自由末端。"""
+    points = np.asarray(points, dtype=float)
+    start = np.asarray(start, dtype=float)
+    if points.size == 0:
+        points = np.empty((0, 2))
+    if (points.ndim != 2 or points.shape[1] != 2 or start.shape != (2,)
+            or not np.isfinite(points).all() or not np.isfinite(start).all()):
+        raise ValueError('路线坐标必须是有限二维坐标。')
+    count = len(points)
+    if order is None:
+        pending, route, position = list(range(count)), [], start
+        while pending:
+            index = min(pending, key=lambda i: (np.linalg.norm(points[i] - position), i))
+            route.append(index)
+            pending.remove(index)
+            position = points[index]
+    else:
+        route = list(order)
+        if sorted(route) != list(range(count)):
+            raise ValueError('路线必须恰好访问每个顶点一次。')
+    distances = np.linalg.norm(points[:, None] - points[None, :], axis=2)
+    start_distances = np.linalg.norm(points - start, axis=1)
+    improved = True
+    while improved:
+        improved = False
+        for i in range(count - 1):
+            for j in range(i + 1, count):
+                b, c = route[i], route[j]
+                old = start_distances[b] if i == 0 else distances[route[i - 1], b]
+                new = start_distances[c] if i == 0 else distances[route[i - 1], c]
+                # 开路径末端没有回程边，不能按闭合旅行商问题增加虚构边。
+                if j + 1 < count:
+                    old += distances[c, route[j + 1]]
+                    new += distances[b, route[j + 1]]
+                if new < old - 1e-7:
+                    route[i:j + 1] = reversed(route[i:j + 1])
+                    improved = True
+    return route
+
+
 @dataclass
 class RegionResult:
     """区域分类结果；空集直径为 None，无界区域直径为正无穷。"""
