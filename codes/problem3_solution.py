@@ -114,8 +114,6 @@ class Problem3Config:
     # 交给 MPC 收尾（不中途打断）。
     route_handoff_detected: bool = False
     route_max_nodes: int = 0
-<<<<<<< HEAD
-=======
     # 双站交会追击（2026-09-12 联调试证伪，默认关闭，保留作消融开关）：
     # 对已有一次示向读数的频道，在其锚点侧向（垂直于示向方向）
     # `rendezvous_offsets_m` 距离上布置第二检测站候选。两示向线交会把不确定
@@ -124,7 +122,6 @@ class Problem3Config:
     # GDOP 更优的第二站几何。见 solutions/problem3_flow.md §10.2。
     rendezvous_chase: bool = False
     rendezvous_offsets_m: tuple = (600.0, 900.0, 1200.0)
->>>>>>> b15e9cf5f3b345ae6a2e9132e036edb8871ea08f
     # 折返抑制（默认关闭，单位秒）：候选停靠点的方位与"上一段实际移动方位"夹角超过
     # `turn_penalty_angle_deg` 时，在其评分上加惩罚。动机：MPC 每轮贪心选点会在两个
     # 方向相反的目标之间来回切换——n12 案例实测出现 500 m 去 + 500 m 回的 A→B→A
@@ -183,11 +180,6 @@ class Problem3Config:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f'{name} 必须为正整数。')
-<<<<<<< HEAD
-        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region'):
-            if not isinstance(getattr(self, name), bool):
-                raise ValueError(f'{name} 必须为布尔值。')
-=======
         for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region',
                      'rendezvous_chase'):
             if not isinstance(getattr(self, name), bool):
@@ -196,7 +188,6 @@ class Problem3Config:
         if (not isinstance(offsets, (tuple, list)) or not offsets
                 or any(isinstance(v, bool) or not np.isfinite(v) or v <= 0 for v in offsets)):
             raise ValueError('双站交会偏距必须为非空的有限正数序列。')
->>>>>>> b15e9cf5f3b345ae6a2e9132e036edb8871ea08f
         if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
             raise ValueError('追踪路径限制必须非负且有限。')
         if not self.lookahead_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.lookahead_lengths_m):

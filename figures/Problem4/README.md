@@ -6,13 +6,8 @@
 | --- | --- | --- |
 | `practice_p4_L1.{png,svg}` | **官方模拟器真实演练**（14:15，4全向+6定向共10源） | 10/10 清除、`all_channels_resolved`、虚拟 33005 s；记录 `output/Problem4/mission_p4_20260911-141541.json` |
 | `practice_p4_L2.{png,svg}` | **官方模拟器真实演练**（21:21，6全向+9定向共15源） | 15/15 清除、`all_channels_resolved`、635 动作、虚拟 14694.8 s；记录 `output/Problem4/mission_p4_20260911-212119.json`。该局使用宽步长但 `tracking_limit=8`，不能单独证明 `tracking_limit=2` 的收益 |
-<<<<<<< HEAD
-| `mission_all_channels_resolved.{png,svg}` | 离线 `--sources 12 --seed 1 --figures` | 混合12源（6个定向），12/12清除 + 8频道证书判为不存在；记录 `output/protocol/offline-mission_p4_20260911-142326.json` |
-| `mission_cleared_limit.{png,svg}` | 离线 `--sources 16 --seed 1 --directional 0 --figures` | 全向16源，清满上界收工；记录 `output/protocol/offline-mission_p4_20260911-142336.json` |
-=======
 | `mission_all_channels_resolved.{png,svg}` | 离线 `--sources 12 --seed 1 --figures` | 混合12源（6个定向），12/12清除 + 8频道证书判为不存在；原始离线记录已随 2026-09-12 离线记录清理删除 |
 | `mission_cleared_limit.{png,svg}` | 离线 `--sources 16 --seed 1 --directional 0 --figures` | 全向16源，清满上界收工；原始离线记录已随 2026-09-12 离线记录清理删除 |
->>>>>>> b15e9cf5f3b345ae6a2e9132e036edb8871ea08f
 
 在线演练记录在 `output/Problem4/`；离线记录已不再保留（2026-09-12 起测试一律以服务器演练模式为准，
 历史离线记录彻底删除，离线 CLI 产物加入 `.gitignore`）。约定见 `output/README.md`、`output/protocol/README.md`。

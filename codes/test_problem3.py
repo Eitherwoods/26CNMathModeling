@@ -899,8 +899,6 @@ class TurnPenaltyTests(unittest.TestCase):
         self.assertAlmostEqual(self.strategy.last_move_bearing_deg, -90.0, places=6)
 
 
-<<<<<<< HEAD
-=======
 class RendezvousChaseTests(unittest.TestCase):
     """双站交会追击：门控默认关闭；开启时按锚点侧向生成第二站候选。"""
 
@@ -937,7 +935,6 @@ class RendezvousChaseTests(unittest.TestCase):
                 Problem3Config(rendezvous_offsets_m=offsets)
 
 
->>>>>>> b15e9cf5f3b345ae6a2e9132e036edb8871ea08f
 class OfflineEndToEndTests(unittest.TestCase):
     """离线端到端：固定案例必须全部清除；轮次与停滞保护必须生效。"""
 
