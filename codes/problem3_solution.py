@@ -154,7 +154,9 @@ class Problem3Config:
     # 2026-09-12 扫档：均值（q=0）在 5 案例上最优，q=0.7/0.9 均略差，默认 0。
     belief_chase_quantile: float = 0.0
     # 同站频道排序改按"可排除后验质量"（增益阈值仍用证书口径的面积）。
-    belief_search_ranking: bool = True
+    # 2026-09-12 扫档证伪：质量排序会系统性偏向"已经变窄"的频道，挤占
+    # 宽覆盖检测（10 案例端到端从 -2.55% 恶化到 -0.75%），默认关闭，保留开关。
+    belief_search_ranking: bool = False
     real_time_reserve_s: float = 15.0
     min_action_capacity: int = 10
     max_rounds: int = 400
@@ -403,8 +405,9 @@ class Problem3Strategy:
     def _search_options(self, waypoint, min_gain, cap):
         """一个停靠点上值得检测的频道：已发现频道全取，未发现频道按增益取前 cap 个。
 
-        增益阈值始终用证书口径的新增排除面积；排序键在置信层开启时改为
-        "该站可排除的后验质量"（Koopman 期望清除概率质量），关闭时与基线一致。
+        增益阈值与默认排序都用证书口径的新增排除面积；`belief_search_ranking`
+        开启时排序键改为"该站可排除的后验质量"（Koopman 期望清除概率质量），
+        该模式在扫档中被证伪（见配置注释），保留作消融开关。
         """
         detected, searchable = [], []
         for channel in self._active_channels():

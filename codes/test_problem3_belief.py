@@ -212,15 +212,15 @@ class StrategyWiringTests(unittest.TestCase):
 
     def test_search_rank_uses_mass_when_enabled_and_gain_when_disabled(self):
         waypoint = (0.0, 0.0)
-        self.strategy.candidates  # 触发布站构造，保证 _reach 缓存可用
         channel = next(iter(self.strategy.channels))
         gain = self.strategy._search_gain(channel, waypoint)
         self.assertGreater(gain, 0.0)
+        # 默认（排序关闭）与基线一致；显式开启后按后验质量排序。
+        self.assertAlmostEqual(self.strategy._search_rank(channel, waypoint, gain),
+                               gain, places=9)
+        self.strategy.config = Problem3Config(belief_search_ranking=True)
         rank_on = self.strategy._search_rank(channel, waypoint, gain)
         self.assertTrue(0.0 < rank_on <= 1.0)
-        self.strategy.config = Problem3Config(belief_search_ranking=False,
-                                              belief_enabled=True)
-        self.assertAlmostEqual(self.strategy._search_rank(channel, waypoint, gain), gain, places=9)
 
     def test_clear_candidates_prefers_certain_over_bets(self):
         probe = self.strategy.channels[5]
