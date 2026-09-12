@@ -9,7 +9,7 @@
 | 目录 | 内容 |
 |---|---|
 | `codes/` | 全部 Python 代码：几何模型、四问求解器、协议层、离线桩、演练自动化、测试（详见 [codes/README.md](codes/README.md)、[codes/README_problem1.md](codes/README_problem1.md)） |
-| `solutions/` | 建模方案与流程文档：总方案、问题 2/3/4 分问流程、审查记录（`REVIEW-*.md`）、题目原文（`Question-B/`） |
+| `solutions/` | 建模方案与流程文档：总方案、问题 2/3/4 分问流程、审查记录（`REVIEW-*.md`）、题目原文（`Question-B/`）、**论文证据包（`evidence/`，含 P3/P4 证据链与测量方法论）** |
 | `body/` | 论文 LaTeX 工程（`main.tex` + `cumcmthesis.cls`），编译产物 `main.pdf` |
 | `figures/` | 论文插图，按问题分目录，PNG 预览 + SVG 论文版（总索引见 [figures/README.md](figures/README.md)） |
 | `output/` | 运行结果：演练协议日志进 `output/protocol/`，在线演练任务记录进 `output/Problem3\|4/`（约定见 [output/README.md](output/README.md)） |
