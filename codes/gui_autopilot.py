@@ -497,6 +497,14 @@ def back_to_drill_list(win, audit: Audit, problem: int):
     raise AutopilotError("无法回到演练列表页（找不到 " + target + "）")
 
 
+def drill_button_visible(win, problem: int) -> bool:
+    """当前页面是否可见「开始问题N演练测试」按钮（白名单逐字匹配）。"""
+    target = drill_button_name(problem)
+    return any(el.element_info.control_type == "Button"
+               and el.element_info.name == target
+               for el in all_controls(win))
+
+
 def cmd_full(args):
     audit = Audit()
     for round_no in range(1, args.rounds + 1):
@@ -505,7 +513,8 @@ def cmd_full(args):
         do_login_if_needed(win, audit)
         win = attach()
         dismiss_announcement(win, audit)
-        if round_no > 1:
+        # 首局也可能停在上一局的会话结束页：找不到演练按钮先回列表页。
+        if round_no > 1 or not drill_button_visible(win, args.problem):
             win = back_to_drill_list(win, audit, args.problem)
         start_drill(win, audit, args.problem)
         wait_interface_ready(win, audit)

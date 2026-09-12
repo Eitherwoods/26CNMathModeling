@@ -568,10 +568,13 @@ class CoverageCertificateTests(unittest.TestCase):
         self.assertGreater(worst, 700.0, '最坏距离过小，采样可能失真')
 
     def test_candidates_exclude_out_of_region_points(self):
-        """候选集必须剔除落在目标圆域外的格点（曾混入 4 个半径 2400 的点）。"""
+        """候选集必须剔除落在目标圆域外的格点（曾混入 4 个半径 2400 的点）。
+
+        默认 hybrid15 = 九点方格 ∪ 七点六边形去重，共 15 个候选。
+        """
         radii = np.hypot(self.strategy.candidates[:, 0], self.strategy.candidates[:, 1])
         self.assertLessEqual(radii.max(), TARGET_RADIUS_M + 1e-9)
-        self.assertEqual(len(self.strategy.candidates), 9)
+        self.assertEqual(len(self.strategy.candidates), 15)
 
     def test_certificate_rejects_insufficient_coverage(self):
         """只测一个点就判"不存在"时，证书必须拒绝认证。"""
@@ -582,14 +585,14 @@ class CoverageCertificateTests(unittest.TestCase):
         self.assertEqual(certificate['no_signal_stations'], 1)
 
     def test_certificate_accepts_full_coverage(self):
-        """九点全测后掩码为空，证书必须给出认证，且覆盖半径不超过 1000 m。"""
+        """候选点全测后掩码为空，证书必须给出认证，且覆盖半径不超过 1000 m。"""
         probe = self.strategy.channels[6]
         for x, y in self.strategy.candidates:
             probe.observe_no_signal(x, y)
         self.assertTrue(probe.is_excluded)
         certificate = self.strategy._exclusion_certificate(6)
         self.assertTrue(certificate['certified'])
-        self.assertEqual(certificate['no_signal_stations'], 9)
+        self.assertEqual(certificate['no_signal_stations'], len(self.strategy.candidates))
         self.assertLessEqual(certificate['covering_radius_m'], MIN_RECEIVE_RADIUS_M)
 
     def test_certificates_skip_cleared_channels(self):
@@ -722,6 +725,7 @@ class BackstopSearchTests(unittest.TestCase):
 
     def test_dynamic_endgame_competes_with_fixed_grid(self):
         """达到源数下界后，动态空洞方案应能替代更慢的固定格点方案。"""
+        self.strategy.config = Problem3Config(route_endgame_min_clears=14)
         for channel in range(1, MIN_SOURCE_COUNT + 1):
             self.strategy.channels[channel].mark_cleared(0.0)
             self.strategy.cleared.add(channel)
@@ -734,6 +738,8 @@ class BackstopSearchTests(unittest.TestCase):
 
     def test_dynamic_endgame_waits_until_source_lower_bound(self):
         """清除不足十个源时仍保持常规搜索，避免过早转入不存在性收尾。"""
+        self.strategy.config = Problem3Config(route_endgame_min_clears=14,
+                                              dynamic_endgame_min_clears=10)
         for channel in range(1, MIN_SOURCE_COUNT):
             self.strategy.channels[channel].mark_cleared(0.0)
             self.strategy.cleared.add(channel)

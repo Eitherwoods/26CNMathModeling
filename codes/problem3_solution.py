@@ -48,13 +48,19 @@ class Problem3Config:
     lattice_spacing_m: float = 10.0
     planning_spacing_m: float = 50.0
     candidate_spacing_m: float = 1200.0
-    candidate_radius_m: float = 1500.0
-    candidate_layout: str = 'grid9'
-    lookahead_directions: int = 12
+    # 六边形环半径：1400 时最坏漏检 sqrt(1800²+1400²−2·1800·1400·cos30°)
+    # ≈ 914 m < 1000 m，证书仍成立；扫档显示比 1500 略优。
+    candidate_radius_m: float = 1400.0
+    # 候选布局：hybrid15 = 九点方格 ∪ 七点六边形（覆盖证书见 _search_plan；
+    # 九点最坏漏检 848.36 m < 1000 m，并集只增不减，证书不变）。
+    # 2026-09-11 多轮离线扫档：比 grid9 端到端少 ~4% 虚拟时间（更多站点
+    # 使追击顺路与补证巡航的每站信息量更高）。
+    candidate_layout: str = 'hybrid15'
+    lookahead_directions: int = 24
     lookahead_lengths_m: tuple = (250.0, 500.0, 900.0)
-    lookahead_hypotheses: int = 10
+    lookahead_hypotheses: int = 15
     chase_options_limit: int = 4
-    local_lookahead_limit_m: float = 300.0
+    local_lookahead_limit_m: float = 500.0
     approach_direct_m: float = 400.0
     # 追踪途中已经支付了移动代价，多测几个有价值频道通常比日后专程折返更省时。
     search_channels_per_stop: int = 3
@@ -63,6 +69,45 @@ class Problem3Config:
     fill_search_stops: bool = True
     endgame_seconds: float = 60.0
     search_risk_premium: float = 1.25
+    # 接收范围感知追击（2026-09-11 扫档采纳，8 案例再省 ~3.5%）：源的有效接收
+    # 半径 a∈[1000,1500] 未知。若候选检测点到全部可能位置都超过 1000 m，则读到
+    # 示向度没有保证；按保守口径把"读不到"分支的剩余逼近距离计入评分，
+    # 避免在接收边界外反复空测（实测收敛链中 U 值可连续多轮停滞在 ~1000 m）。
+    receive_aware_chase: bool = True
+    # True 时把"无任何保证可读位置"的候选直接跳过（更激进）；False 只在
+    # 超过接收半径上界（必然读不到）时跳过。惩罚倍率用于放大无信号分支代价。
+    receive_aware_skip_unread: bool = False
+    receive_aware_penalty_scale: float = 1.0
+    # 两阶段调度（默认关闭）：只要仍有已发现未清除的频道，就不为覆盖搜索单开
+    # 停靠点。问题四实测该策略大幅优于"覆盖优先"；追击途中的顺路检测
+    # （search_channels_per_stop）不受影响。
+    finish_detected_before_search: bool = False
+    # 二步滚动前瞻（0=关闭）：对粗格网单步评分前 K 个追击候选模拟"检测后
+    # 再走一步"，用 travel2+剩余2 重评。只展开小候选集，控制单次决策耗时。
+    chase_rollout_topk: int = 0
+    chase_rollout_lengths_m: tuple = (400.0,)
+    chase_rollout_directions: int = 8
+    # 无信号补证路线模拟的 2-opt 改进（默认关闭）：贪心最近站序列构造后，
+    # 对访问顺序做 2-opt（站点集合与各站检测频道不变，覆盖结果不变），
+    # 取改进后与原序列的较小总耗时。
+    absence_route_2opt: bool = False
+    # 承诺式补证游（默认关闭；开启时通常连同 absence_route_2opt）：把 2-opt
+    # 改进后的完整路线缓存并按序执行，期间任何示向/近场读数（出现新发现）
+    # 立即作废该路线。只改"估计与执行一致"，不改覆盖站点集合与证书。
+    absence_tour_commit: bool = False
+    # 策略形态：'mpc' 沿用逐轮重规划；'route' 启用 Route-First（巡游主导 +
+    # 两站交会，见 problem3_route.py，正确性层完全共用）。
+    strategy_mode: str = 'mpc'
+    # Route-First 参数：巡游站点集（'hybrid15' 全部候选 / 'grid9' 证书九点）、
+    # 交会不确定半径低于该值即受控偏离清除、偏离最远距离。
+    route_tour_set: str = 'hybrid15'
+    route_spec_radius_m: float = 80.0
+    route_deviation_budget_m: float = 900.0
+    # 存在已发现但交会未成熟的频道时，本轮交给 MPC 追击（实测带偏巡游，
+    # 默认关闭）；route_max_nodes>0 时巡游只负责前 K 站批量发现，之后整体
+    # 交给 MPC 收尾（不中途打断）。
+    route_handoff_detected: bool = False
+    route_max_nodes: int = 0
     speculative_clear_m: float = 45.0
     speculative_min_probability: float = 0.30
     real_time_reserve_s: float = 15.0
@@ -78,12 +123,15 @@ class Problem3Config:
     # 不被零星毛刺引走（实测阈值过低会使行进反升）。
     backstop_min_hole_m2: float = 4.0e5
     backstop_max_stations: int = 12
-    # 已清除数达到题目下界且没有待追踪源时，动态残余空洞候选与固定格点同台评分。
+    # 已清除数达到阈值且没有待追踪源时，动态残余空洞候选与固定格点同台评分。
+    # 阈值 8 低于题面下界 10：动态方案只参与站点选择（不参与结束判定），
+    # 提前激活可减少收尾阶段固定格点的跨场折返；扫档 −0.4%。
     enable_dynamic_endgame: bool = True
-    dynamic_endgame_min_clears: int = MIN_SOURCE_COUNT
+    dynamic_endgame_min_clears: int = 8
     # 清除数较高时，按“剩余频道均无信号”的情景估计完整补证路线，只执行首站。
+    # 2026-09-11 扫档：6（题面下界 10 的 60%）比 14 端到端再省 ~3%。
     enable_route_aware_endgame: bool = True
-    route_endgame_min_clears: int = 14
+    route_endgame_min_clears: int = 6
     # 可选停靠点回访惩罚。同站补测开启后默认关闭，避免把仍有价值的近点推迟到
     # 收尾阶段，形成跨场折返；保留参数便于关闭同站补测时做对照实验。
     revisit_radius_m: float = 400.0
@@ -96,7 +144,8 @@ class Problem3Config:
     route_planner: str = 'greedy'
     # 若计划移动距离超过该阈值，则在直线路径上采样中间检测点并择优停靠；
     # 0 表示不启用。代价是 5 s 检测 + 可能 1 s 切换，必须能缩短后续行程才划算。
-    intermediate_stop_gap_m: float = 0.0
+    # 2026-09-11 扫档：800 m 在 8 案例基准上最稳（−6% 左右）。
+    intermediate_stop_gap_m: float = 800.0
     intermediate_stop_min_gain_m2: float = 2.0e5
 
 
@@ -164,6 +213,9 @@ class Problem3Strategy:
         # 该状态只记录可由示向读数严格保证的追踪上界，不参与细格网可靠结论。
         self.tracking_states: dict = {}
         self.tracking_wait_rounds = {channel: 0 for channel in self.channels}
+        # 承诺式补证游：[(waypoint, ordered_channels)] 与下一站指针。
+        self.absence_tour = None
+        self.absence_tour_pos = 0
 
     def _build_candidates(self):
         """构造具有覆盖证明的搜索候选停靠点。
@@ -390,6 +442,33 @@ class Problem3Strategy:
             return self._local_lookahead(knowledge, limit), '近场前瞻'
         return self._lookahead_waypoint(channel, knowledge), '远场前瞻'
 
+    def _receive_penalty(self, mask, lattice, waypoint):
+        """接收范围感知评分：返回惩罚秒数，None 表示该候选必然读不到、应跳过。
+
+        检测点 $X$ 到可能位置的距离决定读数分支：距离 ≤ 1000 m（接收半径下界）
+        时读数有保证；> 1500 m 时必然无信号且只排除空集，检测纯属浪费；
+        (1000,1500] 是否可读取决于未知的 a，按保守口径视为读不到。无信号分支下
+        机器狗仍需继续逼近，故以"读不到那部分位置的最坏距离 / 速度"按面积比例
+        计入惩罚，不引入任何分布假设。
+        """
+        points = lattice.points[mask]
+        if not len(points):
+            return 0.0
+        if len(points) > 4000:
+            points = points[::int(np.ceil(len(points) / 4000))]
+        distances = np.linalg.norm(points - np.asarray(waypoint, dtype=float), axis=1)
+        if float(distances.min()) > MAX_RECEIVE_RADIUS_M + lattice.covering_radius_m:
+            return None
+        readable = distances <= MIN_RECEIVE_RADIUS_M + lattice.covering_radius_m
+        if self.config.receive_aware_skip_unread and not readable.any():
+            return None
+        fraction = float(np.mean(readable))
+        if fraction >= 1.0:
+            return 0.0
+        worst_unread = float(distances[~readable].max())
+        return (self.config.receive_aware_penalty_scale
+                * (1.0 - fraction) * worst_unread / ROBOT_SPEED_MPS)
+
     def _local_lookahead(self, knowledge, limit):
         """细格网局部前瞻：候选点少、假设点取覆盖圆圆心，单次决策保持毫秒级。"""
         center, radius = knowledge.region_estimate(use_fine=True)
@@ -407,6 +486,11 @@ class Problem3Strategy:
         for waypoint in candidates:
             if not self._station_is_new(knowledge.channel, waypoint):
                 continue
+            penalty = 0.0
+            if self.config.receive_aware_chase:
+                penalty = self._receive_penalty(knowledge.mask, self.fine, waypoint)
+                if penalty is None:
+                    continue
             travel_s = float(np.hypot(waypoint[0] - self.position[0],
                                       waypoint[1] - self.position[1])) / ROBOT_SPEED_MPS
             total, count = 0.0, 0
@@ -425,7 +509,7 @@ class Problem3Strategy:
                     break
             if count == 0:
                 continue
-            score = travel_s + (total / count) / ROBOT_SPEED_MPS
+            score = travel_s + (total / count) / ROBOT_SPEED_MPS + penalty
             if score < best_score:
                 best, best_score = waypoint, score
         return best
@@ -445,6 +529,7 @@ class Problem3Strategy:
         hypotheses = points[::step][:self.config.lookahead_hypotheses]
         angles = np.arange(self.config.lookahead_directions) * (360.0 / self.config.lookahead_directions)
         directions = np.column_stack((np.cos(np.deg2rad(angles)), np.sin(np.deg2rad(angles))))
+        scored = []
         best, best_score = None, float('inf')
         for length in self.config.lookahead_lengths_m:
             for direction in directions:
@@ -453,6 +538,11 @@ class Problem3Strategy:
                     continue
                 if not self._station_is_new(channel, waypoint):
                     continue
+                penalty = 0.0
+                if self.config.receive_aware_chase:
+                    penalty = self._receive_penalty(mask, self.coarse, waypoint)
+                    if penalty is None:
+                        continue
                 travel_s = length / ROBOT_SPEED_MPS
                 total, count = 0.0, 0
                 for source in hypotheses:
@@ -467,9 +557,73 @@ class Problem3Strategy:
                         count += 1
                 if count == 0:
                     continue
-                score = travel_s + (total / count) / ROBOT_SPEED_MPS
+                score = travel_s + (total / count) / ROBOT_SPEED_MPS + penalty
+                scored.append((score, waypoint))
                 if score < best_score:
                     best, best_score = waypoint, score
+        if (self.config.chase_rollout_topk > 0 and len(scored) > 1):
+            return self._rollout_best(channel, mask, hypotheses, scored)
+        return best
+
+    def _rollout_best(self, channel, mask, hypotheses, scored):
+        """二步滚动前瞻：对单步评分最好的前 K 个候选，模拟"检测后走第二步"。
+
+        单步评分是短视的——它不知道检测完还能继续逼近。此处对前 K 个候选
+        逐一模拟第二步（在预测掩码上再选一个最优停靠点），以
+        "travel1 + min over 第二步(travel2 + 最坏剩余2)/速度" 重评并取最优。
+        第二步候选集很小（chase_rollout_directions × lengths），只在 K 个候选
+        上展开，单次决策保持毫秒级。
+        """
+        rollout_directions = np.arange(self.config.chase_rollout_directions) * (
+            360.0 / self.config.chase_rollout_directions)
+        dirs2 = np.column_stack((np.cos(np.deg2rad(rollout_directions)),
+                                 np.sin(np.deg2rad(rollout_directions))))
+        best, best_score = None, float('inf')
+        for _, waypoint in sorted(scored, key=lambda item: item[0])[
+                :self.config.chase_rollout_topk]:
+            total, count = 0.0, 0
+            for source in hypotheses:
+                for error in (-ANGLE_ERROR_DEG, ANGLE_ERROR_DEG):
+                    bearing = float(bearing_deg(source - waypoint)) + error
+                    predicted = apply_direction(mask, self.coarse,
+                                                waypoint[0], waypoint[1], bearing)
+                    if not predicted.any():
+                        continue
+                    branch_best = None
+                    for length2 in self.config.chase_rollout_lengths_m:
+                        for direction in dirs2:
+                            wp2 = waypoint + length2 * direction
+                            if np.hypot(*wp2) > self.config.candidate_radius_m + 900.0:
+                                continue
+                            if not self._station_is_new(channel, wp2):
+                                continue
+                            bearing2 = float(bearing_deg(source - wp2)) + error
+                            predicted2 = apply_direction(predicted, self.coarse,
+                                                         wp2[0], wp2[1], bearing2)
+                            if not predicted2.any():
+                                continue
+                            remaining2 = np.linalg.norm(
+                                self.coarse.points[predicted2] - wp2, axis=1)
+                            value = (length2 / ROBOT_SPEED_MPS
+                                     + (float(np.max(remaining2))
+                                        + self.coarse.covering_radius_m) / ROBOT_SPEED_MPS)
+                            if branch_best is None or value < branch_best:
+                                branch_best = value
+                    if branch_best is None:
+                        # 第二步无可行点时退回单步口径（只计剩余距离）。
+                        remaining = np.linalg.norm(
+                            self.coarse.points[predicted] - waypoint, axis=1)
+                        branch_best = ((float(np.max(remaining))
+                                        + self.coarse.covering_radius_m) / ROBOT_SPEED_MPS)
+                    total += branch_best
+                    count += 1
+            if count == 0:
+                continue
+            score = (float(np.hypot(waypoint[0] - self.position[0],
+                                    waypoint[1] - self.position[1])) / ROBOT_SPEED_MPS
+                     + total / count)
+            if score < best_score:
+                best, best_score = waypoint, score
         return best
 
     def _predicted_series(self, channel, waypoint):
@@ -503,6 +657,10 @@ class Problem3Strategy:
         "某频道凑不齐 9 点就被判终止"的窗口。兜底段是这一窗口的安全网，
         同时也能在候选格网因配置改动而不再完备时自动补救。
         """
+        # 承诺式补证游进行中：估计用的顺序与执行顺序一致（见 _tour_plan）。
+        tour_plan = self._tour_plan()
+        if tour_plan is not None:
+            return tour_plan
         # 剩余源数的上界：既受总数上限约束，也不能超过"还没清除的频道数"。
         # 注意不能用 len(_active_channels())——它包含尚未判定排除的频道，
         # 会把剩余源数估高，进而高估搜索性价比、低估追击优先级。
@@ -575,13 +733,47 @@ class Problem3Strategy:
                     'route_backstop', np.asarray(waypoint, dtype=float), measures,
                     self._travel_m(waypoint), score_s=total_s,
                     note='路线前瞻兜底：执行无信号情景最短补证路线的首站')
+        # 承诺式补证游：对最终选中的首站重模拟一次，缓存 2-opt 后的完整
+        # 路线。此后每轮直接按序执行下一站，直到出现新发现或路线耗尽——
+        # 保证"估计用的顺序"与"实际执行的顺序"一致。
+        if (best is not None and self.config.absence_tour_commit
+                and self.config.route_planner != 'dijkstra'):
+            _, sequence = self._absence_route_seconds(
+                best.waypoint, best.measures, active, return_sequence=True)
+            self.absence_tour = sequence
+            self.absence_tour_pos = 0
         return best
 
-    def _absence_route_seconds(self, first_waypoint, first_measures, active_channels):
+    def _tour_plan(self):
+        """返回承诺式补证游的下一站计划；路线失效或耗尽时返回 None。"""
+        if (not self.config.absence_tour_commit
+                or not self.absence_tour
+                or self.absence_tour_pos >= len(self.absence_tour)):
+            return None
+        while self.absence_tour_pos < len(self.absence_tour):
+            waypoint, channels = self.absence_tour[self.absence_tour_pos]
+            pending = [channel for channel in channels
+                       if self.channels[channel].is_active
+                       and self._station_is_new(channel, waypoint)]
+            if pending:
+                remaining_s = self._travel_s(waypoint) + self._measure_cost_s(pending)
+                return StopPlan(
+                    'tour_station', np.asarray(waypoint, dtype=float), pending,
+                    self._travel_m(waypoint), score_s=remaining_s,
+                    note=f'承诺补证游第{self.absence_tour_pos + 1}/'
+                         f'{len(self.absence_tour)}站')
+            self.absence_tour_pos += 1
+        return None
+
+    def _absence_route_seconds(self, first_waypoint, first_measures, active_channels,
+                               return_sequence=False):
         """在掩码副本上模拟无信号补证路线，返回移动与测量总时间估计。
 
         后续每一步仅在固定覆盖格点中选择距离当前位置最近、且仍能排除残余
         区域的站点。固定格点具有完整覆盖证明，因此模拟若正常结束必能清空掩码。
+        `absence_route_2opt` 开启时，贪心序列构造完成后对访问顺序做 2-opt
+        改进（站点集合与各站检测频道不变，覆盖结果不变），返回两种顺序中
+        较小的总耗时。
         """
         masks = {channel: self.channels[channel].mask.copy()
                  for channel in active_channels}
@@ -589,6 +781,7 @@ class Problem3Strategy:
         total_s = 0.0
         visited = set()
         simulated_channel = self.current_channel
+        visit_sequence = []
 
         def visit(waypoint, channels):
             """在模拟副本上访问一个站点，并累计移动与测量时间。"""
@@ -611,10 +804,19 @@ class Problem3Strategy:
                 masks[channel] &= ~reach
             position = waypoint
             visited.add((round(float(waypoint[0]), 6), round(float(waypoint[1]), 6)))
+            visit_sequence.append((waypoint, ordered))
 
         visit(first_waypoint, first_measures)
         for _ in range(len(self.candidates)):
             if not any(mask.any() for mask in masks.values()):
+                sequence = None
+                if self.config.absence_route_2opt and len(visit_sequence) > 2:
+                    improved = self._two_opt_route_seconds(visit_sequence)
+                    if improved is not None and improved < total_s:
+                        sequence = self._two_opt_order(visit_sequence)
+                        total_s = improved
+                if return_sequence:
+                    return total_s, (sequence or list(visit_sequence))
                 return total_s
             options = []
             for waypoint in self.candidates:
@@ -635,6 +837,58 @@ class Problem3Strategy:
             _, _, waypoint, channels = min(options, key=lambda item: (item[0], item[1]))
             visit(waypoint, channels)
         return float('inf')
+
+    def _two_opt_order(self, visit_sequence):
+        """返回 2-opt 改进后的访问顺序（不重算时间，只重排索引）。"""
+        start = np.asarray(self.position, dtype=float)
+        points = [np.asarray(waypoint, dtype=float) for waypoint, _ in visit_sequence]
+        count = len(points)
+        order = list(range(count))
+
+        def path_length(sequence):
+            previous = start
+            total = 0.0
+            for index in sequence:
+                total += float(np.linalg.norm(points[index] - previous))
+                previous = points[index]
+            return total
+
+        improved = True
+        while improved:
+            improved = False
+            for i in range(count - 1):
+                for j in range(i + 1, count):
+                    candidate = order[:i] + order[i:j + 1][::-1] + order[j + 1:]
+                    if path_length(candidate) < path_length(order) - 1e-6:
+                        order = candidate
+                        improved = True
+        return [visit_sequence[index] for index in order]
+
+    def _two_opt_route_seconds(self, visit_sequence):
+        """对无信号补证路线的访问顺序做 2-opt，返回改进后的总耗时估计。
+
+        只重排访问顺序：各站点的检测频道集合不变，因此掩码清空结果与原
+        序列完全一致；总耗时按新顺序重算（行进 + 测量 + 频道切换）。
+        """
+        start = np.asarray(self.position, dtype=float)
+        reordered = self._two_opt_order(visit_sequence)
+        total_s = 0.0
+        position = start
+        simulated_channel = self.current_channel
+        for waypoint, ordered_channels in reordered:
+            total_s += float(np.linalg.norm(waypoint - position)) / ROBOT_SPEED_MPS
+            previous = simulated_channel
+            switches = 0
+            for channel in ordered_channels:
+                if channel != previous:
+                    switches += 1
+                previous = channel
+            total_s += (MEASURE_TIME_S * len(ordered_channels)
+                        + CHANNEL_SWITCH_TIME_S * switches)
+            if ordered_channels:
+                simulated_channel = ordered_channels[-1]
+            position = waypoint
+        return total_s
 
     def _dijkstra_absence_route_seconds(self, first_waypoint, first_measures, active_channels):
         """用插入启发式 + Dijkstra 距离优化无信号补证路线。
@@ -964,7 +1218,9 @@ class Problem3Strategy:
         """决策1+2：在所有选项中选择"期望每秒清除数"最大者。"""
         try:
             options = self._chase_options()
-            search = self._search_plan()
+            search = None
+            if not (self.config.finish_detected_before_search and options):
+                search = self._search_plan()
         except Exception:
             # 规划层异常不终止任务：记录后交回主循环，由停滞计数安全收尾。
             self.planner_errors += 1
@@ -1079,6 +1335,13 @@ class Problem3Strategy:
                 channel, plan.waypoint, response,
                 guaranteed_upper_m=guaranteed_upper)
             acted = True
+        if (plan.kind in ('tour_station', 'route_backstop')
+                and self.absence_tour is not None
+                and self.absence_tour_pos < len(self.absence_tour)
+                and np.allclose(np.asarray(plan.waypoint, dtype=float),
+                                np.asarray(self.absence_tour[self.absence_tour_pos][0],
+                                           dtype=float), atol=1e-6)):
+            self.absence_tour_pos += 1
         return acted
 
     def _apply_measure(self, channel, waypoint, response, guaranteed_upper_m=None):
@@ -1106,6 +1369,9 @@ class Problem3Strategy:
             self.tracking_wait_rounds[channel] = 0
         else:
             knowledge.observe_no_signal(waypoint[0], waypoint[1], virtual)
+        if result in ('direction', 'near'):
+            # 出现新发现即推翻"剩余频道均无信号"的补证游前提。
+            self.absence_tour = None
         self.current_channel = channel
         self._record(channel, 'measure', result, response)
         self._sample_channel(channel)
@@ -1340,8 +1606,16 @@ class Problem3Strategy:
 
 
 def run_mission(context, config=None):
-    """在给定上下文上运行问题三策略，返回任务记录。"""
-    return Problem3Strategy(context, config).run()
+    """在给定上下文上运行问题三策略，返回任务记录。
+
+    `config.strategy_mode == 'route'` 时改用 Route-First 策略
+    （`problem3_route.RouteFirstStrategy`），正确性层与记录格式完全一致。
+    """
+    effective = config or Problem3Config()
+    if getattr(effective, 'strategy_mode', 'mpc') == 'route':
+        from .problem3_route import run_route_mission
+        return run_route_mission(context, effective)
+    return Problem3Strategy(context, effective).run()
 
 
 def is_offline_run(context):
