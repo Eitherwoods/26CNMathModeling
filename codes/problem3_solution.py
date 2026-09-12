@@ -67,7 +67,9 @@ class Problem3Config:
     approach_direct_m: float = 400.0
     # 追踪途中已经支付了移动代价，多测几个有价值频道通常比日后专程折返更省时。
     search_channels_per_stop: int = 3
-    search_min_gain_m2: float = 5.0e4
+    # 2026-09-12 联调复扫：1.5e5 比旧值 5e4 端到端再省 ~0.9%（基准 299.2 s/源；
+    # 留出种子 331.8 vs 336.4），方向在两组独立案例上一致。
+    search_min_gain_m2: float = 1.5e5
     # 一旦已经决定访问某个搜索停靠点，顺手完成该点全部正增益频道，避免日后折返。
     fill_search_stops: bool = True
     endgame_seconds: float = 60.0
@@ -112,6 +114,14 @@ class Problem3Config:
     # 交给 MPC 收尾（不中途打断）。
     route_handoff_detected: bool = False
     route_max_nodes: int = 0
+    # 双站交会追击（2026-09-12 联调试证伪，默认关闭，保留作消融开关）：
+    # 对已有一次示向读数的频道，在其锚点侧向（垂直于示向方向）
+    # `rendezvous_offsets_m` 距离上布置第二检测站候选。两示向线交会把不确定
+    # 半径压到约 ε·d²/s，但实测 +3%（行进更长而信息不增）：MPC 的
+    # 24 方向×15 假设前瞻已覆盖"横向换位"选项，且沿示向线的 Ray-step 才是
+    # GDOP 更优的第二站几何。见 solutions/problem3_flow.md §10.2。
+    rendezvous_chase: bool = False
+    rendezvous_offsets_m: tuple = (600.0, 900.0, 1200.0)
     # 折返抑制（默认关闭，单位秒）：候选停靠点的方位与"上一段实际移动方位"夹角超过
     # `turn_penalty_angle_deg` 时，在其评分上加惩罚。动机：MPC 每轮贪心选点会在两个
     # 方向相反的目标之间来回切换——n12 案例实测出现 500 m 去 + 500 m 回的 A→B→A
@@ -170,9 +180,14 @@ class Problem3Config:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f'{name} 必须为正整数。')
-        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region'):
+        for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region',
+                     'rendezvous_chase'):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f'{name} 必须为布尔值。')
+        offsets = self.rendezvous_offsets_m
+        if (not isinstance(offsets, (tuple, list)) or not offsets
+                or any(isinstance(v, bool) or not np.isfinite(v) or v <= 0 for v in offsets)):
+            raise ValueError('双站交会偏距必须为非空的有限正数序列。')
         if not np.isfinite(self.tracking_path_limit_m) or self.tracking_path_limit_m < 0:
             raise ValueError('追踪路径限制必须非负且有限。')
         if not self.lookahead_lengths_m or any(not np.isfinite(v) or v <= 0 for v in self.lookahead_lengths_m):
@@ -407,6 +422,8 @@ class Problem3Strategy:
                                         note=f'频道{channel}已可证清除',
                                         target_channel=channel))
                 continue
+            if self.config.rendezvous_chase:
+                options.extend(self._rendezvous_options(channel, knowledge))
             waypoint, note = self._chase_waypoint(channel, knowledge, limit)
             if waypoint is None or not self._station_is_new(channel, waypoint):
                 continue
@@ -427,6 +444,43 @@ class Problem3Strategy:
     def _tracking_ratio():
         """返回示向误差上界下保证性追踪的距离收缩系数 q。"""
         return 1.0 / (2.0 * np.cos(np.deg2rad(ANGLE_ERROR_DEG)))
+
+    def _rendezvous_options(self, channel, knowledge):
+        """双站交会追击选项（2026-09-12 证伪，见 problem3_flow.md §10.2）：
+        在首次示向锚点两侧对称、垂直于示向方向的 `rendezvous_offsets_m` 距离上
+        布置第二检测站候选，与其余追击选项同一尺度评分。默认关闭。"""
+        state = self.tracking_states.get(channel)
+        if state is None or state['upper_m'] <= CLEAR_RADIUS_M:
+            return []
+        bearing_rad = np.deg2rad(float(state['bearing_deg']))
+        perp = np.array([-np.sin(bearing_rad), np.cos(bearing_rad)])
+        anchor = np.asarray(state['anchor'], dtype=float)
+        options = []
+        for sign in (-1.0, 1.0):
+            for offset_m in self.config.rendezvous_offsets_m:
+                waypoint = anchor + sign * offset_m * perp
+                if np.hypot(*waypoint) > self.config.candidate_radius_m + 900.0:
+                    continue
+                if not self._station_is_new(channel, waypoint):
+                    continue
+                penalty = 0.0
+                if self.config.receive_aware_chase:
+                    penalty = self._receive_penalty(knowledge.plan_mask, self.coarse, waypoint)
+                    if penalty is None:
+                        continue
+                measures = self._search_options(waypoint, self.config.search_min_gain_m2,
+                                                self.config.search_channels_per_stop)
+                if not knowledge.certain_clear(waypoint[0], waypoint[1]) and channel not in measures:
+                    measures.append(channel)
+                measures = self._order_measures(measures)
+                if not measures:
+                    continue
+                score = (self._clear_expectation_s(channel, waypoint, measures) + penalty)
+                options.append(StopPlan(
+                    'chase', waypoint, measures, self._travel_m(waypoint), score_s=score,
+                    note=f'频道{channel}双站交会{sign * offset_m:+.0f}m',
+                    target_channel=channel))
+        return options
 
     def _tracking_remaining_s(self, upper_m):
         """估计从安全距离上界 U 出发完成保证性追踪所需的保守虚拟时间。"""
