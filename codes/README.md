@@ -210,6 +210,17 @@ python -m unittest codes.test_problem3 -v
 与 `codes/scenario.py` 生成的案例，仅作故障排查用；其统计量**不是官方演练成绩**，
 记录不再保留。按 `tester/README.md` 的约定，演练测试与正式测试一律由人工在模拟器界面触发。
 
+问题三的搜索收益可用 `Problem3Config.search_reward_mode` 切换：默认
+`expected_finds`，实验性的 `information_gain` 使用粗格网上的期望熵减；倍率由
+`information_gain_scale` 控制。离线同构 Engine 对照示例（仅用于复现机制）：
+
+```powershell
+$env:OMP_NUM_THREADS='1'
+python -X utf8 -m codes.benchmark_q34_local --problem 3 --seeds 1 2 `
+  --overrides '{"search_reward_mode":"information_gain","information_gain_scale":0.25}' `
+  --output .workbuddy/p3-entropy-local.json
+```
+
 ## 问题四代码与本地自检
 
 建模审查见 `solutions/REVIEW-Q4-2026-09-11.md`，实现、近似边界与运行结果见
