@@ -27,10 +27,20 @@
 | `Problem3/test7` | 09-13 07:06 — 09-13 07:40 | 6 |
 | `Problem3/test8` | 09-13 09:27 — 09-13 09:51 | 46 |
 | `Problem3/test9` | 09-13 10:46 — 09-13 11:29 | 18 |
+| `Problem3/test10` | 09-13 13:28 — 09-13 13:35 | 20 |
 | `Problem4/test3` | 09-11 14:15 — 09-12 16:33 | 25 |
 | `Problem4/test4` | 09-12 16:48 — 09-12 16:49 | 4 |
 | `Problem4/test5` | 09-12 17:05 — 09-13 05:26 | 24 |
 | `Problem4/test6` | 09-13 06:58 — 09-13 07:02 | 10 |
 | `Problem4/test7` | 09-13 10:53 — 09-13 10:58 | 10 |
+| `Problem4/test8` | 09-13 12:56 — 09-13 13:23 | 60 |
 
 新增批次时自建下一个 `testN/`，并回填本表。
+
+## 定稿代码 30 局演练统计（2026-09-13）
+
+问题三 = `Problem3/test8` 官方 20 局 + `Problem3/test10` 10 局；
+问题四 = `Problem4/test8` 30 局（test7 批次的 `joint_route_with_track=False`
+与定稿默认不一致，不计入）。官方统计源：模拟器
+`practice-statistics-queue.sqlite3`（含真实源数），逐局与汇总数字见
+solutions/evidence/drill-30rounds-20260913.md。
