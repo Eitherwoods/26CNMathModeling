@@ -11,14 +11,7 @@ from .problem4_model import SearchPolicy as OriginalPolicy
 from .problem4_model import coverage_points as original_coverage
 
 
-def coverage_points(directional=False, spacing=None, ring_radius=1155.0):
-    """Q3 发现站：原点 + 正六边形环。
-
-    环半径 1155 m 是六站结构下 40 m 覆盖格网的最小认证半径加裕量
-    （二分实测最小可行值 1150.7 m；判据为每格顶点到最近锚点
-    ≤ 999.99 m，含格宽 40 m 的展宽效应，比"单点环带闭式解 1124"更紧）。
-    巡线 6R = 6930 m，较旧值 1200 m（7200 m）省 270 m。
-    """
+def coverage_points(directional=False, spacing=None, ring_radius=1200):
     if directional or spacing is not None:
         return original_coverage(directional, spacing)
     return [(0.0, 0.0)] + [
@@ -69,7 +62,7 @@ def economical_point(poly, current, excluded=()):
 class EfficientPolicy(OriginalPolicy):
     share_observations = True
     plan_cover_route = False
-    ring_radius = 1155.0
+    ring_radius = 1200
     def localize(self, channel, first, first_position=None):
         result = first
         pos = self.position if first_position is None else first_position

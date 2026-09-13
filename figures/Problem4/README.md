@@ -8,6 +8,7 @@
 | `practice_p4_L2.{png,svg}` | **官方模拟器真实演练**（21:21，6全向+9定向共15源） | 15/15 清除、`all_channels_resolved`、635 动作、虚拟 14694.8 s；记录 `output/Problem4/mission_p4_20260911-212119.json`。该局使用宽步长但 `tracking_limit=8`，不能单独证明 `tracking_limit=2` 的收益 |
 | `mission_all_channels_resolved.{png,svg}` | 离线 `--sources 12 --seed 1 --figures` | 混合12源（6个定向），12/12清除 + 8频道证书判为不存在；原始离线记录已随 2026-09-12 离线记录清理删除 |
 | `mission_cleared_limit.{png,svg}` | 离线 `--sources 16 --seed 1 --directional 0 --figures` | 全向16源，清满上界收工；原始离线记录已随 2026-09-12 离线记录清理删除 |
+| `certificate_tradeoff.{png,svg}` | 本地同构 Engine 扫档（`codes.plot_certificate_tradeoff`） | **放弃覆盖证书的权衡前沿**（面板 a 问题三 V3 / 面板 b 问题四，各 K=10/12/14/16 × 24 种子）；图题、正文讨论段、数据表与口径脚注见同目录 `certificate_tradeoff.md`。本地口径，非官方成绩，仅用于论文讨论节 |
 
 在线演练记录在 `output/Problem4/`；离线记录已不再保留（2026-09-12 起测试一律以服务器演练模式为准，
 历史离线记录彻底删除，离线 CLI 产物加入 `.gitignore`）。约定见 `output/README.md`、`output/protocol/README.md`。
