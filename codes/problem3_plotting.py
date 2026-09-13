@@ -61,7 +61,7 @@ def _plot_trajectory(ax, record, scenario):
     ax.grid(alpha=0.2)
 
 
-def _plot_convergence(ax, record):
+def _plot_convergence(ax, record, panel='(b)'):
     """各频道可能位置集合的最坏剩余距离随检测次数下降。"""
     drawn = 0
     for channel, series in sorted(record['channel_series'].items(), key=lambda item: int(item[0])):
@@ -78,17 +78,17 @@ def _plot_convergence(ax, record):
                 ha='right', va='bottom', fontsize=8, color=CLEARED_COLOR)
     ax.set_yscale('log')
     ax.set(xlabel='该频道的检测次数', ylabel='可能位置到当前位置的最远距离 (m)',
-           title='(b) 可能位置集合收敛')
+           title=f'{panel} 可能位置集合收敛')
     if drawn:
         ax.legend(fontsize=7, ncol=2)
     ax.grid(alpha=0.2, which='both')
 
 
-def _plot_timeline(ax, record):
+def _plot_timeline(ax, record, panel='(c)'):
     """动作耗时的构成：移动、检测、频道切换与清除。"""
     steps = record['steps']
     if not steps:
-        ax.set_title('(c) 动作时间构成（无动作）')
+        ax.set_title(f'{panel} 动作时间构成（无动作）')
         return
     virtual = np.array([step['virtual_time_s'] for step in steps], dtype=float)
     deltas = np.diff(np.concatenate(([record['start_virtual_time_s']], virtual)))
@@ -112,7 +112,7 @@ def _plot_timeline(ax, record):
            color=CLEARED_COLOR, label='光学定位与清除')
     total = float(deltas.sum())
     ax.set(xlabel='整局任务', ylabel='虚拟时间 (s)',
-           title=f'(c) 动作时间构成（合计 {total:.0f} s）', xticks=[])
+           title=f'{panel} 动作时间构成（合计 {total:.0f} s）', xticks=[])
     ax.legend(fontsize=8, loc='upper left')
     ax.grid(alpha=0.2, axis='y')
 
