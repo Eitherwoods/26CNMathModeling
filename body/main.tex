@@ -206,7 +206,53 @@ A_rp\leq b_r+\tau_f,\quad r=1,\ldots,2m
 
 为了得到沿边界排列的顶点序列，计算顶点算术平均 $\bar V=\frac1n\sum_{j=1}^{n}V_j$，再按极角 $\phi_j=\operatorname{atan2}(y_j-\bar y,\;x_j-\bar x)$ 从小到大排序；由 $P$ 的凸性，该顺序就是多边形的边界顺序，可直接供后续直径算法使用。
 
-整个求解流程可以这样组织：第一步，把全部 $2m$ 条边界写成 $Ap\leq b$ 并作线性可行性判断，不可行即 $P=\varnothing$；第二步，沿 $\pm x$、$\pm y$ 四个方向检查有界性，只要有一个方向无界，直径便记为正无穷；第三步，按式~\eqref{eq:det_kl} 与式~\eqref{eq:cramer_kl} 枚举筛点，经 $\tau_v$ 去重后排序；末步按顶点仿射维数区分点、线段与正常二维多边形，直径相应取 $0$、线段长度和顶点对最大距离。
+整个求解流程如\cref{fig:flow-diameter} 所示：先作线性可行性判断以排除空区域，再独立检查有界性，随后枚举筛点并排序，最后按顶点仿射维数分类计算直径。
+
+\begin{figure}[!htb]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  node distance=5mm,
+  box/.style={rectangle, rounded corners=2pt, draw, align=center,
+              inner sep=4pt, minimum height=10mm, text width=26mm},
+  dia/.style={diamond, draw, align=center, inner sep=1pt, aspect=1.5,
+              minimum width=22mm},
+  term/.style={rectangle, draw, align=center, inner sep=4pt,
+               minimum height=8mm, text width=24mm},
+  ar/.style={->, thick},
+  lab/.style={font=\footnotesize, inner sep=1.5pt}
+]
+\node[box] (s1) {整理$2m$ 条示向边界\\为 $Ap\leq b$};
+\node[dia, right=of s1] (d1) {线性\\可行？};
+\node[term, below=of d1] (t1) {$P=\varnothing$\\判定结束};
+
+\node[box, right=of d1] (s2) {沿 $\pm x$、$\pm y$\\四方向检查有界性};
+\node[dia, right=of s2] (d2) {四向\\有界？};
+\node[term, below=of d2] (t2) {$D(P)=+\infty$\\判定结束};
+
+\node[box, right=of d2] (s3)
+  {枚举筛点、$\tau_v$ 去重\\并按极角排序};
+\node[dia, right=of s3] (d3) {顶点\\维数};
+\node[term, below=of d3] (t3) {点：$D(P)=0$\\线段：取线段长};
+\node[box, right=of d3, text width=33mm] (s4)
+  {取顶点对最大距离\\$D(P)=\max\limits_{i<j}\|V_i-V_j\|$};
+
+\draw[ar] (s1) -- (d1);
+\draw[ar] (d1) -- node[lab, above]{是} (s2);
+\draw[ar] (d1) -- node[lab, right]{否} (t1);
+\draw[ar] (s2) -- (d2);
+\draw[ar] (d2) -- node[lab, above]{是} (s3);
+\draw[ar] (d2) -- node[lab, right]{否} (t2);
+\draw[ar] (s3) -- (d3);
+\draw[ar] (d3) -- node[lab, right]{点 / 线段} (t3);
+\draw[ar] (d3) -- node[lab, above]{二维} (s4);
+\end{tikzpicture}}
+
+\caption{定位区域直径的求解流程}
+\label{fig:flow-diameter}
+\end{figure}
 
 容差方面，$\tau_{\parallel}$ 取无量纲的角度容差，$\tau_f$ 与 $\tau_v$ 则按问题尺度取距离容差。需要强调的是，不能仅因有限枚举未找到交点就断言区域为空——可行性与有界性必须先行独立判断。
 
@@ -269,7 +315,7 @@ D(P)=22.775384\ \mathrm{m}.
 
 \begin{figure}[!htb]
 \centering
-\includegraphics[width=0.62\textwidth]{../figures/Problem1/five_stations.png}
+\includegraphics[width=0.9\textwidth]{../figures/Problem1/five_stations.png}
 \caption{五检测点数值实例：(a) 人工验证场景与示向边界；(b) 局部定位区域与最远顶点对（$D(P)=22.775384$ 米）}
 \label{fig:five-stations}
 \end{figure}
