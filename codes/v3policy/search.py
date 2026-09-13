@@ -1,5 +1,4 @@
 """V3 策略选择器：全向源走自适应覆盖策略，定向源不支持（问题四用主线条带）。"""
-from .problem4_model import SearchPolicy as OriginalPolicy
 from .adaptive_search_v3 import AdaptivePolicy
 
 

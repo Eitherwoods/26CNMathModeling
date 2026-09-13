@@ -25,7 +25,7 @@ import numpy as np
 
 from .config import TARGET_RADIUS_M
 from .problem3_model import Lattice
-from .problem3_solution import Problem3Config, Problem3Strategy, StopPlan
+from .problem3_solution import Problem3Strategy, StopPlan
 
 
 class RouteFirstStrategy(Problem3Strategy):

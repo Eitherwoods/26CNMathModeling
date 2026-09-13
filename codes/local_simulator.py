@@ -22,9 +22,6 @@ import hmac
 import json
 import math
 import os
-import re
-import struct
-import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit

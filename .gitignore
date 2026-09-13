@@ -86,6 +86,11 @@ tester/reverse/*
 !tester/reverse/NOTES.md
 !tester/reverse/parse_pclntab.py
 
+# 演练账号凭据（明文，绝不入库；2026-09-13 曾误入库并已推送，见 solutions/code-review-20260913.md E9）
+tester/username-and-password.txt
+tester/*username*password*
+tester/*password*
+
 # SQLite 运行时伴生文件（WAL/SHM，模拟器进程退出后残留，不入库）
 tester/JammersSimulatorData/*.sqlite3-shm
 tester/JammersSimulatorData/*.sqlite3-wal

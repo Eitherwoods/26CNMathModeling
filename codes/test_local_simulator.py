@@ -190,10 +190,11 @@ class TimingReplayTests(unittest.TestCase):
         if not os.path.exists(self.LOG):
             self.skipTest("no recorded session log")
         events = []
-        for line in open(self.LOG, encoding="utf-8"):
-            e = json.loads(line)
-            if e.get("event") in ("request", "response"):
-                events.append(e)
+        with open(self.LOG, encoding="utf-8") as handle:
+            for line in handle:
+                e = json.loads(line)
+                if e.get("event") in ("request", "response"):
+                    events.append(e)
         pos, t, last_ch, pending = (0.0, 0.0), Decimal(0), None, None
         ok = bad = 0
         for e in events:
