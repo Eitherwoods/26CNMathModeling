@@ -6,9 +6,7 @@ import unittest
 
 import numpy as np
 
-from .benchmark_problem3 import benchmark_cases
 from .offline_stub import OfflineStub
-from .problem3_model import Lattice
 from .problem3_route import RouteFirstStrategy, run_route_mission
 from .problem3_solution import Problem3Config, run_mission
 from .protocol import RobotClient

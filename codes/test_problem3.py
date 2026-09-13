@@ -15,8 +15,8 @@ import numpy as np
 from . import config as settings
 from .base_models import distance_to_wedge, min_enclosing_circle, sampled_diameter
 from .config import (CHANNEL_COUNT, CLEAR_RADIUS_M, MAX_RECEIVE_RADIUS_M,
-                     MIN_RECEIVE_RADIUS_M, MIN_SOURCE_COUNT, NEAR_DISTANCE_M,
-                     ROBOT_SPEED_MPS, TARGET_RADIUS_M)
+                     MAX_SOURCE_COUNT, MIN_RECEIVE_RADIUS_M, MIN_SOURCE_COUNT,
+                     NEAR_DISTANCE_M, ROBOT_SPEED_MPS, TARGET_RADIUS_M)
 from .offline_stub import OfflineStub, Source
 from .problem3_model import (CERT_RING_RADIUS_M, ChannelKnowledge, Lattice,
                              apply_direction, apply_distance_order, apply_near,
@@ -849,6 +849,138 @@ class _DummyContext:
 
     def should_stop(self):
         return False
+
+
+class InformationGainTests(unittest.TestCase):
+    """信息增益评分：验证分支熵减与旧评分的可切换性。"""
+
+    def setUp(self):
+        """构造未连接模拟器的最小策略，避免端到端测试耗时。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def test_information_gain_counts_no_signal_partition(self):
+        """中心站同时存在有信号与无信号分支时，期望熵减应为正。"""
+        self.strategy.config = Problem3Config(search_reward_mode='information_gain')
+        before = self.strategy._information_gain_nats(1, (0.0, 0.0))
+        self.assertGreater(before, 0.0)
+        reward = self.strategy._search_reward(5, [1], (0.0, 0.0))
+        self.assertGreater(reward, 0.0)
+
+    def test_no_signal_observation_removes_same_station_information(self):
+        """同站无信号后，可读分支被排除，重复测量的信息增益应降为零。"""
+        self.strategy.config = Problem3Config(search_reward_mode='information_gain')
+        self.strategy.channels[1].observe_no_signal(0.0, 0.0)
+        self.assertAlmostEqual(self.strategy._information_gain_nats(1, (0.0, 0.0)), 0.0)
+
+    def test_expected_finds_mode_keeps_legacy_reward(self):
+        """默认模式仍调用旧期望发现数公式，保证历史配置兼容。"""
+        expected = 7.25
+        self.strategy._expected_finds = lambda remaining, gain: expected
+        reward = self.strategy._search_reward(5, [1], (0.0, 0.0), 1.0e6)
+        self.assertEqual(reward, expected)
+
+    def test_information_gain_scale_must_be_positive(self):
+        """信息增益倍率为零或非有限值时必须在构造期拒绝。"""
+        for value in (0.0, -1.0, float('nan'), float('inf')):
+            with self.assertRaises(ValueError):
+                Problem3Config(information_gain_scale=value)
+
+
+class UpperBoundShortcutTests(unittest.TestCase):
+    """源数上限短路：计数论证的触发条件、可逆性与不污染严格结论。"""
+
+    def setUp(self):
+        """构造未连接模拟器的最小策略。"""
+        self.strategy = Problem3Strategy(_DummyContext())
+
+    def _confirm(self, count, status='detected'):
+        """把前 count 个频道置为已确认存在（detected 或 cleared）。"""
+        channels = sorted(self.strategy.channels)
+        for channel in channels[:count]:
+            knowledge = self.strategy.channels[channel]
+            if status == 'cleared':
+                knowledge.mark_cleared(0.0)
+                self.strategy.cleared.add(channel)
+            else:
+                knowledge.status = 'detected'
+
+    def test_shortcut_inactive_below_source_upper_bound(self):
+        """已确认源数未达上限时，不得短路任何频道。"""
+        self._confirm(MAX_SOURCE_COUNT - 1)
+        self.assertEqual(self.strategy._logically_empty_channels(), set())
+        self.assertEqual(len(self.strategy._active_channels()),
+                         len([c for c, k in self.strategy.channels.items() if k.is_active]))
+
+    def test_shortcut_activates_at_source_upper_bound(self):
+        """已确认源数达到上限时，其余未发现频道应被判为逻辑必空。"""
+        self._confirm(MAX_SOURCE_COUNT)
+        empty = self.strategy._logically_empty_channels()
+        self.assertTrue(empty)
+        for channel in empty:
+            knowledge = self.strategy.channels[channel]
+            self.assertNotIn(knowledge.status, ('cleared', 'detected'))
+            self.assertFalse(knowledge.is_excluded)
+        # 短路频道必须从活跃集合中移除。
+        self.assertTrue(empty.isdisjoint(self.strategy._active_channels()))
+
+    def test_shortcut_preserves_possible_location_mask(self):
+        """短路只停投入，不得改写可能位置集合或观测历史。"""
+        self._confirm(MAX_SOURCE_COUNT)
+        empty = self.strategy._logically_empty_channels()
+        self.assertTrue(empty)
+        channel = sorted(empty)[0]
+        before_mask = self.strategy.channels[channel].mask.copy()
+        before_plan = self.strategy.channels[channel].plan_mask.copy()
+        before_count = len(self.strategy.channels[channel].observations)
+        self.strategy._logically_empty_channels()
+        self.strategy._active_channels()
+        np.testing.assert_array_equal(self.strategy.channels[channel].mask, before_mask)
+        np.testing.assert_array_equal(self.strategy.channels[channel].plan_mask, before_plan)
+        self.assertEqual(len(self.strategy.channels[channel].observations), before_count)
+
+    def test_shortcut_disabled_reproduces_legacy_behaviour(self):
+        """开关关闭时，即便计数达到上限也不短路任何频道。"""
+        self.strategy.config = Problem3Config(upper_bound_shortcut=False)
+        self._confirm(MAX_SOURCE_COUNT)
+        self.assertEqual(self.strategy._logically_empty_channels(), set())
+        self.assertEqual(len(self.strategy._active_channels()),
+                         len([c for c, k in self.strategy.channels.items() if k.is_active]))
+
+    def test_inconsistent_or_excluded_channels_do_not_confirm(self):
+        """矛盾频道与已排除频道都不能充当"存在"证据去凑满上限。"""
+        base = self.strategy
+        channels = sorted(base.channels)
+        for channel in channels[:MAX_SOURCE_COUNT - 1]:
+            base.channels[channel].mark_cleared(0.0)
+            base.cleared.add(channel)
+        self.assertEqual(base._confirmed_sources(), MAX_SOURCE_COUNT - 1)
+        self.assertEqual(base._logically_empty_channels(), set())
+        # 补一个"已排除"频道（掩码空且无读数）不应被计入确认数。
+        victim = channels[MAX_SOURCE_COUNT - 1]
+        base.channels[victim].mask = np.zeros(len(base.channels[victim].mask), dtype=bool)
+        base.channels[victim].plan_mask = np.zeros(len(base.channels[victim].plan_mask), dtype=bool)
+        self.assertTrue(base.channels[victim].is_excluded)
+        self.assertEqual(base._confirmed_sources(), MAX_SOURCE_COUNT - 1)
+        self.assertEqual(base._logically_empty_channels(), set())
+
+    def test_remaining_sources_uses_cleared_count_only(self):
+        """待发现源数上界沿用已清除计数，不被 detected 频道提前扣减。"""
+        self._confirm(4, status='cleared')
+        for channel in sorted(self.strategy.channels)[4:9]:
+            self.strategy.channels[channel].status = 'detected'
+        # 9 个频道已确认存在，但只清除了 4 个：上界仍按 4 计算。
+        self.assertEqual(self.strategy._confirmed_sources(), 9)
+        self.assertEqual(len(self.strategy.cleared), 4)
+        self.assertEqual(self.strategy._remaining_sources(16), MAX_SOURCE_COUNT - 4)
+
+    def test_remaining_sources_clamps_to_uncleared_count(self):
+        """待发现源数不得超过尚未清除的频道数，也不得超过源数上限余额。"""
+        self._confirm(MAX_SOURCE_COUNT - 2, status='cleared')
+        # 上限余额为 2：即便尚未清除的频道还有 3 个，也不得超过 2。
+        self.assertEqual(self.strategy._remaining_sources(3), 2)
+        # 尚未清除的频道更少时，取更紧的小者。
+        self.assertEqual(self.strategy._remaining_sources(1), 1)
+        self.assertEqual(self.strategy._remaining_sources(0), 0)
 
 
 class TurnPenaltyTests(unittest.TestCase):

@@ -34,7 +34,7 @@ from .base_models import (bearing_deg, open_route_order, adaptive_directions,
 from .config import (ANGLE_ERROR_DEG, CHANNEL_COUNT, CHANNEL_SWITCH_TIME_S,
                      CLEAR_RADIUS_M, CLEAR_TIME_S, MAX_RECEIVE_RADIUS_M,
                      MAX_SOURCE_COUNT, MEASURE_TIME_S, MIN_RECEIVE_RADIUS_M,
-                     OPTICAL_TIME_S, ROBOT_SPEED_MPS,
+                     NEAR_DISTANCE_M, OPTICAL_TIME_S, ROBOT_SPEED_MPS,
                      TARGET_RADIUS_M)
 from .problem3_model import (CERT_RING_RADIUS_M, ChannelKnowledge, Lattice,
                              apply_direction, hex_waypoints)
@@ -71,9 +71,26 @@ class Problem3Config:
     # 2026-09-13 曾采纳 3→8，后经顺序单线程确定性对照复检：该档位的观测差
     # 落在并行基准的线程/负载噪声带内（±1%），证据不足，回退 3。
     search_channels_per_stop: int = 3
+    # 搜索收益口径：默认沿用历史的期望发现数；'information_gain' 使用粗格网
+    # 离散观测分支的期望熵减，并换算为同尺度的等价期望发现数。
+    search_reward_mode: str = 'expected_finds'
+    # 信息增益换算到等价期望发现数的倍率；仅在 information_gain 模式生效，
+    # 用于控制“额外测量”相对移动与追击收益的激进程度。
+    information_gain_scale: float = 1.0
     # 2026-09-12 联调复扫：1.5e5 比旧值 5e4 端到端再省 ~0.9%（基准 299.2 s/源；
     # 留出种子 331.8 vs 336.4），方向在两组独立案例上一致。
     search_min_gain_m2: float = 1.5e5
+    # 源数上限短路：已确认存在的源数达到 MAX_SOURCE_COUNT 后，其余未发现频道
+    # 由计数论证判为必空，不再为其检测或补覆盖证书（不改写 mask，只停投入）。
+    #
+    # 2026-09-13 实测（官方同构 Engine，16 源 10 局：种子 6/16/18/36/37/70/72/74/77/79）：
+    #   16 源层每源 235.4 -> 231.2 s（-1.78%），按官方 16 源占比 12.5% 折算到
+    #   整体均值仅 -0.22%。10 局中 4 局持平（免证窗口从未打开）、0 局恶化，
+    #   最大单局 -9.6%（种子 79）。墙钟 +15%~+20%（每次 _active_channels 都要
+    #   重算集合），但优化目标是虚拟时间，故保留启用。
+    # 根因：detected 未清除的窗口极短，confirmed 达 16 时几乎已等价于 cleared
+    # 达 16（马上就 cleared_limit 收工），可省的投入所剩无几。
+    upper_bound_shortcut: bool = True
     # 一旦已经决定访问某个搜索停靠点，顺手完成该点全部正增益频道，避免日后折返。
     fill_search_stops: bool = True
     endgame_seconds: float = 60.0
@@ -240,8 +257,12 @@ class Problem3Config:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
                 raise ValueError(f'{name} 必须为正整数。')
+        if self.search_reward_mode not in ('expected_finds', 'information_gain'):
+            raise ValueError("search_reward_mode 必须为 'expected_finds' 或 'information_gain'。")
+        if not np.isfinite(self.information_gain_scale) or self.information_gain_scale <= 0.0:
+            raise ValueError('information_gain_scale 必须为正的有限数。')
         for name in ('rolling_search_route', 'adaptive_initial_direction', 'allocation_by_region',
-                     'rendezvous_chase'):
+                     'rendezvous_chase', 'upper_bound_shortcut'):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f'{name} 必须为布尔值。')
         offsets = self.rendezvous_offsets_m
@@ -346,6 +367,9 @@ class Problem3Strategy:
         self.stop_reason = 'running'
         self._started_at = time.monotonic()
         self._reach_cache: dict = {}
+        # 粗格网几何缓存：同一停靠点在一个规划轮次会被多个频道重复评分，
+        # 距离与角度只计算一次，频道自身的 plan_mask 仍逐次读取最新状态。
+        self._entropy_geometry_cache: dict = {}
         # channel -> {anchor: (x, y), bearing_deg: theta, upper_m: U}。
         # 该状态只记录可由示向读数严格保证的追踪上界，不参与细格网可靠结论。
         self.tracking_states: dict = {}
@@ -401,7 +425,52 @@ class Problem3Strategy:
         return int(budget / per_action)
 
     def _active_channels(self):
-        return [channel for channel, knowledge in self.channels.items() if knowledge.is_active]
+        logical_empty = self._logically_empty_channels()
+        return [channel for channel, knowledge in self.channels.items()
+                if knowledge.is_active and channel not in logical_empty]
+
+    def _confirmed_sources(self):
+        """已确认存在的干扰源数：已清除 + 已取得信号读数但尚未清除。
+
+        依据是题目给定的源数上限 `MAX_SOURCE_COUNT`。一个频道一旦拿到非无信号
+        读数（status 转为 detected），其存在即有观测证据，即便尚未清除也应占位。
+        处于矛盾状态的频道（有读数却算出空掩码）不计入——那是数值退化或约束
+        不一致的信号，不能当作"存在"的证据去凑满上限。
+        """
+        confirmed = len(self.cleared)
+        for knowledge in self.channels.values():
+            if (knowledge.status == 'detected' and not knowledge.is_inconsistent
+                    and not knowledge.is_excluded):
+                confirmed += 1
+        return confirmed
+
+    def _logically_empty_channels(self):
+        """源数上限已满时，其余未发现频道逻辑上必然为空。
+
+        这是计数论证而非几何论证：题目限定干扰源总数不超过 `MAX_SOURCE_COUNT`，
+        若已确认存在的源数达到该上限，则任何尚未发现（status 为 unknown）的
+        频道都不可能再含干扰源，无需为它们做覆盖排除证书，也不值得再检测。
+
+        与几何排除的区别在于它不改写 `mask`——可能位置集合仍按观测如实维护，
+        这里只决定"不再为该频道投入动作"，因此不污染任何严格结论。
+        """
+        if not self.config.upper_bound_shortcut:
+            return set()
+        if self._confirmed_sources() < MAX_SOURCE_COUNT:
+            return set()
+        return {channel for channel, knowledge in self.channels.items()
+                if knowledge.status != 'cleared' and knowledge.status != 'detected'
+                and not knowledge.is_excluded}
+
+    def _remaining_sources(self, uncleared):
+        """尚未定位的源数上界：源数上限减去已清除的源数。
+
+        这里刻意沿用 `len(self.cleared)` 而不是 `_confirmed_sources()`：已 detected
+        但尚未清除的源若被提前扣除，会低估搜索的期望发现数，压低搜索优先级，
+        实测 12/14 源局每源时间 +2.8%~+6.6%（种子 1/3/4，2026-09-13）。
+        即"待发现源数"只在真正免证时才有意义，不可用于日常评分。
+        """
+        return min(MAX_SOURCE_COUNT - len(self.cleared), uncleared)
 
     def _detected_channels(self):
         return [channel for channel, knowledge in self.channels.items()
@@ -935,7 +1004,7 @@ class Problem3Strategy:
         # 注意不能用 len(_active_channels())——它包含尚未判定排除的频道，
         # 会把剩余源数估高，进而高估搜索性价比、低估追击优先级。
         uncleared = CHANNEL_COUNT - len(self.cleared)
-        remaining_sources = min(MAX_SOURCE_COUNT - len(self.cleared), uncleared)
+        remaining_sources = self._remaining_sources(uncleared)
         if remaining_sources <= 0:
             return None
         fixed_plan = None
@@ -1418,7 +1487,7 @@ class Problem3Strategy:
             gain = self._measure_gain(measures, waypoint)
             if gain <= 0.0:
                 continue
-            expected = self._expected_finds(remaining_sources, gain)
+            expected = self._search_reward(remaining_sources, measures, waypoint, gain)
             if expected <= 0.0:
                 continue
             follow_up = self._follow_up_seconds(waypoint) + self.config.endgame_seconds
@@ -1516,7 +1585,7 @@ class Problem3Strategy:
                         if self.config.fill_search_stops else qualifying)
             measures = measures[:max(1, self._search_cap())]
             gain = self._measure_gain(measures, waypoint)
-            expected = self._expected_finds(remaining_sources, gain)
+            expected = self._search_reward(remaining_sources, measures, waypoint, gain)
             if expected <= 0.0:
                 continue
             # 新发现干扰源的后续清除代价也要计入，否则会高估搜索的性价比。
@@ -1568,6 +1637,86 @@ class Problem3Strategy:
         if gain_m2 <= 0.0:
             return 0.0
         return remaining_sources / CHANNEL_COUNT * gain_m2 / TARGET_AREA_M2
+
+    def _information_gain_nats(self, channel, waypoint):
+        """按粗格网离散观测分支计算单频道期望熵减（单位：nat）。
+
+        位置格点采用均匀先验。观测结果划分为无信号、距离过近和带角度的
+        示向三类；示向再按 ``2 * ANGLE_ERROR_DEG`` 的角宽离散化。对各分支
+        大小 ``n_b`` 使用 ``log(n)-sum_b(n_b/n)*log(n_b)``，因此只依赖
+        ``plan_mask``，不会修改真实知识状态，也不会把启发式分支当成证书。
+        """
+        knowledge = self.channels[channel]
+        mask = np.asarray(knowledge.plan_mask, dtype=bool)
+        prior_count = int(np.count_nonzero(mask))
+        if prior_count <= 1:
+            return 0.0
+        covering = float(self.coarse.covering_radius_m)
+        receive_inner = max(0.0, MIN_RECEIVE_RADIUS_M - covering)
+        near_inner = max(0.0, NEAR_DISTANCE_M - covering)
+
+        key = (round(float(waypoint[0]), 3), round(float(waypoint[1]), 3))
+        geometry = self._entropy_geometry_cache.get(key)
+        if geometry is None:
+            offset = self.coarse.points - np.asarray(key, dtype=float)
+            all_distances = np.linalg.norm(offset, axis=1)
+            bin_width = max(2.0 * float(ANGLE_ERROR_DEG), 1e-6)
+            all_bins = np.floor(
+                (np.degrees(np.arctan2(offset[:, 1], offset[:, 0])) % 360.0)
+                / bin_width).astype(np.int64)
+            geometry = (all_distances, all_bins)
+            self._entropy_geometry_cache[key] = geometry
+        all_distances, all_bins = geometry
+        distances = all_distances[mask]
+        bins_for_mask = all_bins[mask]
+
+        branch_sizes = []
+        near = distances <= near_inner
+        if np.any(near):
+            branch_sizes.append(int(np.count_nonzero(near)))
+        directional = (distances > near_inner) & (distances <= receive_inner)
+        if np.any(directional):
+            # 角度误差界为 ±ANGLE_ERROR_DEG，缓存中的桶宽为一个误差宽度。
+            _, counts = np.unique(bins_for_mask[directional], return_counts=True)
+            branch_sizes.extend(int(count) for count in counts)
+        no_signal = distances > receive_inner
+        if np.any(no_signal):
+            branch_sizes.append(int(np.count_nonzero(no_signal)))
+        if len(branch_sizes) <= 1:
+            return 0.0
+        sizes = np.asarray(branch_sizes, dtype=float)
+        probabilities = sizes / float(prior_count)
+        return float(np.log(prior_count) - np.sum(probabilities * np.log(sizes)))
+
+    def _information_gain_finds(self, remaining_sources, channels, waypoint):
+        """把多频道期望熵减换算为 ``expected_finds`` 同尺度的等价数量。
+
+        对每频道以 ``ΔH / log(n)`` 表示其当前位置不确定性的相对缩减，
+        再乘历史评分使用的 ``remaining_sources / CHANNEL_COUNT``。这样旧的
+        ``StopPlan.expect_finds`` 字段仍可直接比较和记录，只是收益来源改为
+        信息量；当粗掩码只有一个格点时相对缩减定义为零。
+        """
+        total_fraction = 0.0
+        for channel in channels:
+            prior_count = int(np.count_nonzero(self.channels[channel].plan_mask))
+            if prior_count <= 1:
+                continue
+            entropy = self._information_gain_nats(channel, waypoint)
+            denominator = float(np.log(prior_count))
+            if denominator > 0.0 and np.isfinite(entropy):
+                total_fraction += max(0.0, entropy / denominator)
+        if total_fraction <= 0.0:
+            return 0.0
+        return (float(remaining_sources) / CHANNEL_COUNT
+                * float(self.config.information_gain_scale) * total_fraction)
+
+    def _search_reward(self, remaining_sources, channels, waypoint, gain_m2=None):
+        """返回当前配置口径的搜索收益，兼容旧期望发现数接口。"""
+        if self.config.search_reward_mode == 'expected_finds':
+            if gain_m2 is None:
+                gain_m2 = self._measure_gain(channels, waypoint)
+            return self._expected_finds(remaining_sources, gain_m2)
+        return self._information_gain_finds(remaining_sources, channels, waypoint)
 
     def _follow_up_seconds(self, waypoint):
         """在 waypoint 新发现一个目标后，还需要多少移动时间。
@@ -1725,8 +1874,8 @@ class Problem3Strategy:
                       + float(np.linalg.norm(target - waypoint))
                       - length) / ROBOT_SPEED_MPS
             cost = detour + self._measure_cost_s(measures)
-            expected = self._expected_finds(
-                min(MAX_SOURCE_COUNT - len(self.cleared), len(active)), gain)
+            expected = self._search_reward(
+                self._remaining_sources(len(active)), measures, waypoint, gain)
             if expected <= 0.0:
                 continue
             score = cost / expected
@@ -2022,8 +2171,7 @@ class Problem3Strategy:
         try:
             self.config = relaxed
             return self._backstop_search_plan(
-                min(MAX_SOURCE_COUNT - len(self.cleared),
-                    CHANNEL_COUNT - len(self.cleared)))
+                self._remaining_sources(CHANNEL_COUNT - len(self.cleared)))
         finally:
             self.config = original
 

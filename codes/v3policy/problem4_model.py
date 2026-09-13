@@ -1,6 +1,6 @@
 """Stateful policy using only public action responses, with finite coverage fallback."""
 import math
-from .geometry import initial_region, clip_bearing, clip_range, minimum_enclosing_circle, contains_point
+from .geometry import initial_region, clip_bearing, clip_range, minimum_enclosing_circle
 from .problem2_model import choose_second_point
 
 def coverage_points(directional=False, spacing=None):
