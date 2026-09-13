@@ -458,7 +458,56 @@ S_2^* = \operatorname*{arg\,max}_{X \in \mathcal R_v} \Delta(X\mid F_1)
 
 \subsection{第二检测点选择算法流程}
 
-求解流程为：(1)~\textbf{区域解析构造}——解析裁剪 $F_1$ 边界并构建保守网格外包（射线—圆、圆—圆交点，不作粗采样）；(2)~\textbf{可靠区域认证}——按式~\eqref{eq:reliable_cert} 逐点检验，取保守内部近似为 $C_{\mathrm{rec}}$；(3)~\textbf{价值评价}——枚举相容反馈区间，由式~\eqref{eq:phi}、式~\eqref{eq:delta} 计算 $\Delta$ 的认证上下界；(4)~\textbf{候选与选点}——按式~\eqref{eq:C_good} 与式~\eqref{eq:S2_star} 两级筛选并选定 $S_2^*$，输出连续区域、代表点及数值精度。
+问题二的求解流程如\cref{fig:flow-p2} 所示：依次完成区域解析构造、可靠区域认证、价值评价与候选选点四步，其中可靠性证书与两级筛选均设有细化回环。
+
+\begin{figure}[!htb]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  node distance=5mm,
+  box/.style={rectangle, rounded corners=2pt, draw, align=center,
+              inner sep=4pt, minimum height=18mm, text width=30mm},
+  dia/.style={diamond, draw, align=center, inner sep=1pt, aspect=1.3,
+              minimum width=22mm},
+  term/.style={rectangle, draw, align=center, inner sep=4pt,
+               minimum height=8mm, text width=27mm},
+  ar/.style={->, thick},
+  lab/.style={font=\footnotesize, inner sep=1.5pt}
+]
+% —— 主链 ——
+\node[box] (b1) {\textbf{（1）区域解析构造}\\解析裁剪 $F_1$ 边界\\构建保守网格外包\\射线—圆、圆—圆交点\\（不作粗采样）};
+\node[box, right=of b1] (b2) {\textbf{（2）可靠区域认证}\\按式~\eqref{eq:reliable_cert} 逐点检验\\取保守内部近似 $C_{\mathrm{rec}}$};
+\node[dia, right=of b2] (d1) {式~\eqref{eq:reliable_cert}\\对 $\forall k$ 成立？};
+\node[box, right=of d1] (b3) {\textbf{（3）价值评价}\\枚举相容反馈区间\\由式~\eqref{eq:phi}、\eqref{eq:delta}\\计算 $\Delta_L$ 与 $\Delta_U$};
+\node[dia, right=of b3] (d2) {两级\\筛选};
+\node[box, right=of d2] (b4) {\textbf{（4）候选与选点}\\在 $C_{\mathrm{good}}$ 内取 $\arg\max$\\同分按坐标词典序\\输出代表点 $S_2^*$};
+
+% —— 回环与淘汰端点 ——
+\node[term] (r1) at ($(d1.south)+(0,-19mm)$) {细化边界单元 $\{Q_k\}$};
+\node[term] (r2) at ($(d2.south)+(-16mm,-19mm)$) {细化网格与误差角};
+\node[term] (tel) at ($(d2.south)+(20mm,-19mm)$) {淘汰该候选点};
+
+% —— 主链连接 ——
+\draw[ar] (b1) -- (b2);
+\draw[ar] (b2) -- (d1);
+\draw[ar] (d1) -- node[lab, above]{是} (b3);
+\draw[ar] (b3) -- (d2);
+\draw[ar] (d2) -- node[lab, above]{入选} (b4);
+
+% —— 证书不成立：细化边界单元后回到认证 ——
+\draw[ar] (d1) -- node[lab, right, pos=0.45]{否} (r1);
+\draw[ar] (r1.west) -| (b2.south);
+
+% —— 两级筛选：淘汰 / 边界待定则细化后重评 ——
+\draw[ar] (d2) -- node[lab, right, pos=0.4]{淘汰} (tel);
+\draw[ar] (d2) -- node[lab, left, pos=0.4]{边界待定} (r2);
+\draw[ar] (r2.west) -| (b3.south);
+\end{tikzpicture}}
+\caption{问题二：第二检测点选择算法的求解流程（含证书与筛选的细化回环）}
+\label{fig:flow-p2}
+\end{figure}
 
 \subsection{问题二结果检验}\label{sec:verify}
 
