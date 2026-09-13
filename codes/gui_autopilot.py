@@ -226,15 +226,26 @@ def drill_button_name(problem: int) -> str:
 
 def start_drill(win, audit: Audit, problem: int) -> str:
     """白名单精确匹配「开始问题N演练测试」；含「正式」的按钮绝不触碰。"""
-    assert_no_forbidden_button(win, "启动演练前")
     target_name = drill_button_name(problem)
-    targets = [el for el in all_controls(win)
-               if el.element_info.control_type == "Button"
-               and el.element_info.name == target_name]
-    if len(targets) != 1:
-        raise AutopilotError(
-            f"应恰好命中 1 个「{target_name}」按钮，实际 {len(targets)} 个；"
-            "请跑 discover 核对界面。")
+    # 内容区 WebView2 控件树惰性加载，登录/公告关闭后立即扫描可能为空，
+    # 与 back_to_drill_list 同样采用有限重试并每次重新激活无障碍树。
+    deadline = time.time() + 45.0
+    attempt = 0
+    while True:
+        assert_no_forbidden_button(win, "启动演练前")
+        targets = [el for el in all_controls(win)
+                   if el.element_info.control_type == "Button"
+                   and el.element_info.name == target_name]
+        if len(targets) == 1:
+            break
+        attempt += 1
+        audit.step(win, f"drill-button-wait-{attempt}", {"found": len(targets)})
+        if time.time() >= deadline:
+            raise AutopilotError(
+                f"应恰好命中 1 个「{target_name}」按钮，实际 {len(targets)} 个；"
+                "请跑 discover 核对界面。")
+        time.sleep(3.0)
+        win = attach(wait_s=10)
     if FORBIDDEN_TEXT in target_name:  # 双保险，理论上恒假
         raise AutopilotError("白名单按钮名异常")
     state = [name for ctype, name in page_controls(win)
