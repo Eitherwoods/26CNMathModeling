@@ -11,154 +11,135 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{float}
+\usepackage{longtable}
 \usepackage{titlesec}
 
 \titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
 \titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
 \titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{1em}{}
 
+\newcommand{\recordlink}[2]{\href{#1}{#2}}
+
 \begin{document}
 
 \begin{center}
-    {\LARGE\bfseries 基于嵌套联合优化与射线追踪的FAST主动反射面调节模型}\\[1em]
+    {\LARGE\bfseries 基于测向机示向度的无线电干扰源自动定位与清除策略}\\[1em]
     {\large AI工具使用说明}
 \end{center}
 
 \vspace{1em}
 
-本作品在研究与撰写过程中使用了AI工具辅助完成部分建模思路讨论、代码实现、数值实验与论文修订工作。以下详细说明所用AI工具的名称、使用目的、关键交互内容及人工修改情况。
+本说明根据项目留存的AI交互记录编写，用于说明AI在论文整理、表达校核、图表辅助说明及技术概念澄清中的辅助作用。其中五份来自DeepSeek网页端，一份来自OpenCode共享页面；其中的建议仅作为讨论与编辑参考，模型构建、公式推导、程序运行、数值结果判定及论文定稿均须经团队成员独立核对后采用。
 
 % ============================================================
-\section{所用AI工具信息}
+\section{交互记录与工具信息}
 
 \begin{enumerate}
     \item \textbf{DeepSeek网页端}（\url{https://chat.deepseek.com}）
     \begin{itemize}
-        \item 模型版本：DeepSeek-V4-Flash、DeepSeek-V4-Pro
-        \item 使用时间：2026年8月26日--8月29日
-        \item 用途：赛题理解与建模思路的头脑风暴、几何推导与优化建模思路的校验、论文段落的中文表达润色
+        \item 记录模型：DeepSeek-V4.1-Flash。
+        \item 记录范围：本说明列示五份AI交互记录，链接见表\ref{tab:ai-usage}。
+        \item 使用内容：模型准备的公共定义整理、LaTeX表格排版与报错定位、HTTP接口概念澄清、摘要详略比较、TikZ流程图与图像说明文档的文字起草，以及公式环境与标签的排版整理。
+        \item 使用方式：将题目背景、已有文字或待处理的LaTeX片段提供给AI，获得候选表述、格式建议或排错思路；随后由团队成员结合本题约束、程序输出和论文上下文进行修改与取舍。
     \end{itemize}
-
-    \item \textbf{WorkBuddy}（AI编程助手）
+    \item \textbf{OpenCode共享页面}（\url{https://opncd.ai}）
     \begin{itemize}
-        \item 使用时间：2026年8月26日--8月29日
-        \item 用途：Python求解代码的编写与调试（几何计算、嵌套优化求解、射线追踪与结果输出），数值实验脚本编写，论文修订与LaTeX编译排错辅助
-    \end{itemize}
-
-    \item \textbf{TRAE}（字节跳动AI编程助手）
-    \begin{itemize}
-        \item 使用时间：2026年8月26日--8月29日
-        \item 用途：代码重构与公共模块的抽取，数值实验脚本的批量生成
-    \end{itemize}
-
-    \item \textbf{Codex}（OpenAI代码生成模型）
-    \begin{itemize}
-        \item 使用时间：2026年8月26日--8月29日
-        \item 用途：辅助编写数据处理与结果校核脚本
+        \item 记录模型：GLM-5.3-Flash（共享页显示）。
+        \item 使用内容：将问题二中可能位置区域 $F_1$ 的陈列公式改写为带编号、可交叉引用的\texttt{equation}环境，并补充公式标签。
     \end{itemize}
 \end{enumerate}
 
 % ============================================================
 \section{具体使用目的与环节}
 
-\begin{table}[H]
-\centering
-\caption{AI工具使用情况总览}
-\label{tab:ai-usage}
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{|c|p{5.6cm}|p{4.4cm}|c|}
-\hline
-\textbf{序号} & \textbf{使用目的} & \textbf{对应环节} & \textbf{工具} \\
-\hline
-1 & 调节约束下理想抛物面确定思路讨论 & 问题一/二模型建立 & DeepSeek \\
-\hline
-2 & 径向求交与面板球心反演推导的思路校验 & 几何底座 & DeepSeek \\
-\hline
-3 & 罚函数法、坐标下降等内层求解策略讨论 & 嵌套联合优化 & DeepSeek \\
-\hline
-4 & 几何计算、优化求解与射线追踪核心代码实现 & 全题代码实现 & WorkBuddy \\
-\hline
-5 & 代码重构与公共模块（common.py）抽取 & 工程组织 & TRAE \\
-\hline
-6 & 求解器对照、焦距扫描与敏感性实验脚本 & 实验验证 & TRAE/WorkBuddy \\
-\hline
-7 & 数据预处理与result.xlsx校核脚本 & 结果校验 & Codex \\
-\hline
-8 & 论文修订、图表排版与编译排错 & 论文撰写 & WorkBuddy \\
-\hline
-\end{tabular}
-\end{table}
+\renewcommand{\arraystretch}{1.35}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{@{}c >{\raggedright\arraybackslash}p{5.6cm} >{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{5.0cm}@{}}
+\caption{六份代表性交互记录的用途概览}\label{tab:ai-usage}\\
+\toprule
+\textbf{序号} & \textbf{交互主题与辅助内容} & \textbf{对应环节} & \textbf{网址} \\
+\midrule
+\endfirsthead
+\caption[]{六份交互记录的用途概览（续）}\\
+\toprule
+\textbf{序号} & \textbf{交互主题与辅助内容} & \textbf{对应环节} & \textbf{网址} \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\bottomrule
+\endlastfoot
+1 & 讨论是否设置“模型准备”一节，并起草坐标系、示向角域、集合算子和时间约定等共用定义；同时调整数值实例坐标表的双栏布局。 & 公共定义与论文排版 & \url{https://chat.deepseek.com/share/okjd6rmebcxs06iqfy} \\
+2 & 定位六列表格最后一行多出对齐符导致的编译错误，给出与\texttt{booktabs}风格一致的修正写法。 & LaTeX表格校核 & \url{https://chat.deepseek.com/share/a4wbjd9lf39akz9iif} \\
+3 & 澄清HTTP接口、浏览器客户端及跨域访问的基本概念，为理解模拟器或服务接口的调用方式提供技术背景。 & 技术概念澄清 & \url{https://chat.deepseek.com/share/p2qw3qtb76p4496dx9} \\
+4 & 比较问题一、问题二两版摘要的详略差异，检查算法表述、数值验证、筛选阈值与唯一性规则是否被遗漏。 & 摘要修订与表达校核 & \url{https://chat.deepseek.com/share/xppxhsbxkvl4gax389} \\
+5 & 起草顶点提取TikZ流程图，提出可独立引用的短命题，并为问题一、问题二验证图编写面向文本理解的\texttt{README.md}说明。 & 图表说明与主体格式美化 & \url{https://chat.deepseek.com/share/5e0eor5l1m0at3m8t8} \\
+6 & 将问题二中 $F_1$ 的陈列公式改写为带编号的\texttt{equation}环境，并添加可供后文引用的公式标签。 & 问题二公式排版与编号 & \url{https://opncd.ai/share/z6SuAbcu} \\
+\end{longtable}
 
 % ============================================================
-\section{关键交互记录}
+\section{关键交互内容及处理方式}
 
-本作品的交互记录留存于项目工程日志与代码提交历史中，主要内容归纳如下。
+\subsection{公共定义与数值表格的结构整理}
 
-\subsection{理想交点解的可行性评估与模型结构}
+\textbf{主要咨询内容：}针对四个问题共用的坐标、角度、定位区域和清除条件，讨论是否单设“模型准备”一节；同时将五个检测点及定位区域顶点的纵向表格改排为双栏表格。
 
-\begin{itemize}
-    \item \textbf{主要咨询内容}：\\
-    将基准球面上的主索节点调节为理想抛物面时，促动器只能沿径向伸缩，且相邻索长相对变化不得超过$0.07\%$。直接取节点径向与抛物面交点作为调节目标是否可行？焦距应如何确定？
+\textbf{AI辅助要点：}建议将模型准备定位为简短的公共定义节，集中约定目标圆域、角度环形距离、示向角域、定位区域直径、最小覆盖圆与可靠清除判据，避免在后续问题中重复定义；表格采用左右并列的“对象--坐标”结构以改善版面比例。
 
-    \item \textbf{AI回复要点}：
-    \begin{enumerate}
-        \item 建议先数值检验理想交点解是否满足索长约束，再决定模型结构；
-        \item 若不可行，应将焦距$p$与节点伸缩量$\boldsymbol{\delta}$置于同一优化框架内联合确定，可考虑外层对焦距作一维搜索、内层在约束下求最贴近理想目标的可行解的嵌套结构；
-        \item 内层非凸问题可考虑罚函数法与坐标下降法相结合的策略。
-    \end{enumerate}
+\textbf{人工处理：}团队成员根据正文已有符号体系决定保留的定义范围，并核对公式、单位与题设条件的一致性。具体的顶点枚举、可靠接收区域构造和动态搜索策略仍分别置于相应问题中展开，不在公共定义节重复推导。
 
-    \item \textbf{采纳与修改情况}：\\
-    抛物面一般方程、径向求交二次方程与索长余弦定理解析式均由队员独立推导并手工复核。数值实验证实理想交点解的索长最大相对变化为$0.12809\%$，超过$0.07\%$限值，据此确认嵌套结构的必要性；内层最终采用``罚函数解为初值$+$多顺序坐标下降''的混合多起点策略，较单一方法残差改善$22.1\%$，并以$30$随机种子与独立SLSQP求解器作了全局最优性对照。
-\end{itemize}
+\subsection{LaTeX表格排错与版式统一}
 
-\subsection{内层求解器对照与全局最优性实验}
+\textbf{主要咨询内容：}对定位区域顶点坐标表的编译报错进行定位。
 
-\begin{itemize}
-    \item \textbf{主要交互内容}：\\
-    在WorkBuddy辅助下编写内层求解器对照脚本（问题二方向、$p=140.3839\,\mathrm{m}$固定），比较罚函数法、坐标下降法与混合多起点策略；进一步生成$30$个随机种子坐标下降与独立SLSQP求解的对照实验。
+\textbf{AI辅助要点：}识别出表格列格式为\texttt{ccc|ccc}时，末行多写一个\texttt{\&}会造成单行单元格数量超出六列，并提示\texttt{\textbackslash toprule}、\texttt{\textbackslash midrule}和\texttt{\textbackslash bottomrule}依赖\texttt{booktabs}宏包。
 
-    \item \textbf{结果与处理}：
-    \begin{enumerate}
-        \item 罚函数法、坐标下降法与混合多起点的残差分别为$66.81$、$66.13$、$51.53\,\mathrm{mm}$，坐标下降增至$300$轮结果不变，确认其已收敛至自身局部最优；
-        \item $30$随机种子最优$62.72\,\mathrm{mm}$，SLSQP双起点收敛至$50.11\,\mathrm{mm}$，与混合解仅差$1.4\,\mathrm{mm}$，表明混合解接近全局最优；
-        \item 上述对照经队员复核后写入论文正文与附录表。
-    \end{enumerate}
-\end{itemize}
+\textbf{人工处理：}团队成员删除多余对齐符、统一两张坐标表的列数与表线风格，并在本地重新编译，确认表格、标题和交叉引用均能正常显示。
 
-\subsection{三种贴合度量方案的实现与比较}
+\subsection{摘要的详略比较与术语校核}
 
-\begin{itemize}
-    \item \textbf{主要交互内容}：\\
-    围绕``尽量贴近''的度量，在WorkBuddy与TRAE辅助下实现节点、面板中心、整块面板积分三种拟合优度目标，并在焦距网格上对三种方案各自的真实目标函数独立求解比较。
+\textbf{主要咨询内容：}比较问题一、问题二两版摘要，判断压缩版是否遗漏了影响逻辑完整性的关键信息。
 
-    \item \textbf{结果与处理}：\\
-    三种方案的最优焦距完全一致（$p^{*}=140.3839\,\mathrm{m}$），各指标差异均在$2.5\%$以内；队员据``索长约束是瓶颈''的分析最终选定方案一。全部实验固定随机种子，结果可复现，数据与图表经队员逐项核对后写入论文。
-\end{itemize}
+\textbf{AI辅助要点：}将两版摘要按算法刻画、理论结论、数值验证、候选筛选规则和唯一性保证逐项对比；提示简版中应谨慎压缩“顶点提取完备性”“最小覆盖圆判据”“几何不确定性指标的定义”“筛选阈值”以及“坐标词典序破同分规则”等内容。
 
-\subsection{论文评阅与数值口径修订}
+\textbf{人工处理：}摘要最终以论文篇幅限制为准，保留能反映模型核心链条的结论，并由团队核对其中的复杂度、直径、残差和模拟结果均可由项目代码或正文推导支撑。AI给出的措辞建议不作为数值结论的来源。
 
-\begin{itemize}
-    \item \textbf{主要交互内容}：\\
-    在WorkBuddy辅助下对论文稿进行通读评阅，按严重程度分级给出修改意见，并逐项落实：删除遗留的调试输出命令，统一接收比（$0.3407$）、节点残差（$51.5\,\mathrm{mm}$）等数值在摘要、正文与图表间的口径，为焦距扫描表与正式结果间的微小差异补充来源说明。
+\subsection{流程图、命题与图像说明的辅助起草}
 
-    \item \textbf{采纳与修改情况}：\\
-    全部修改意见经队员逐条确认后才予采纳；修订后重新编译并核对，编译零错误，交叉引用全部解析。
-\end{itemize}
+\textbf{主要咨询内容：}为问题一顶点提取算法绘制紧凑流程图；将适合被后续问题引用的结论整理为短命题；为无法直接读取图像的工具补充验证图的文字说明。
+
+\textbf{AI辅助要点：}给出“枚举不平行边界对--计算交点--检查全部半平面约束--去重与极角排序”的流程图候选布局；建议将“直径的顶点可达性”“直径圆非普遍覆盖”等已有结论用简短命题突出；并按图例、坐标、关键对象和论文用途组织\texttt{README.md}。
+
+\textbf{人工处理：}命题只保留可由正文证明或算例支撑的结论，避免为形式美化新增未经证明的断言；流程图和图像说明中的坐标、直径及覆盖性结论均以实际求解输出和正文为准。
+
+\subsection{HTTP接口概念澄清}
+
+\textbf{主要咨询内容：}询问HTTP接口的组成，以及浏览器能否作为接口调用的客户端。
+
+\textbf{AI辅助要点：}说明请求方法、URL、请求头、请求体、响应体和状态码的基本作用，并解释浏览器既可直接发起GET请求，也可通过页面脚本调用接口；跨域调用还受同源策略与CORS配置约束。
+
+\textbf{人工处理：}该记录仅用于补充技术概念理解，不替代对模拟器接口文档、实际返回结果和程序日志的阅读与验证。
+
+\subsection{问题二可行域公式的编号化排版}
+
+\textbf{主要咨询内容：}将问题二中定义首次检测后可能位置区域 $F_1$ 的陈列公式，由双美元符号形式改为独立的\texttt{equation}环境。
+
+\textbf{AI辅助要点：}建议沿用正文既有公式风格，将 $F_1$ 的集合定义置入\texttt{equation}环境，并增加\texttt{eq:F1\_projection}标签，便于后文通过交叉引用调用。
+
+\textbf{人工处理：}团队成员核对公式内容、标签名称和引用位置是否与正文符号体系一致；公式环境调整仅改变排版与引用方式，不改变 $F_1$ 的数学定义或后续模型结论。
 
 % ============================================================
 \section{人工修改与质量保证}
 
-\begin{enumerate}
-    \item \textbf{模型层面}：全部几何推导（抛物面一般方程、径向求交、面板球心反演、矢量反射定律）与优化模型（嵌套结构、行程与索长约束的形式化）由队员独立完成并手工推演复核；AI工具的讨论输出仅用作思路参考与逻辑校验，未直接采信。
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{模型层面：}定位区域的半平面刻画、顶点枚举完备性、区域直径计算、最小覆盖圆判据、可靠接收区域与候选点价值规则，均以题设、正文推导和代码实现为依据。AI输出仅用于辅助梳理表达和检查逻辑链条。
 
-    \item \textbf{代码层面}：全部Python求解代码由队员在本机调试修正，公共模块经队员重构整理；关键算法的正确性以自洽检验把关——理想抛物面接收比严格为$1.000000$，基准态面板球心反演残差小于$0.02\,\mathrm{m}$（源于附件坐标的舍入）。
+    \item \textbf{代码与数值层面：}正文中的定位区域顶点、直径、残差、模拟清除结果及运行时间均以本地代码运行或模拟器反馈为准。对话中出现的数值和坐标在写入论文前均应与程序输出逐项核对。
 
-    \item \textbf{结果层面}：所有数值结果由队员在本机运行项目代码得到；提交的\texttt{result.xlsx}通过七项独立校核（行列对应、行程限幅、由伸缩量反算坐标、逐边复核索长变化等）；接收比计算通过采样收敛性（$m=10\to30$，波动不足$0.6\%$）与口径覆盖率（$99.98\%$）检验。
+    \item \textbf{图表与排版层面：}表格列数、流程图节点、图例说明、公式编号和交叉引用均由团队成员在XeLaTeX环境中复核；发现版式或编译问题后，以实际编译结果为最终依据。
 
-    \item \textbf{论文层面}：论文正文的建模逻辑、结论表述与工程判断由队员撰写并经全队讨论定稿；AI辅助修订的文字与排版均经队员逐段核对，未直接采用任何未经检验的内容。
+    \item \textbf{论文层面：}论文的研究路线、模型选择、结论表述与工程判断由团队成员负责。AI给出的候选文字、格式模板与技术解释均须结合题目要求审阅、修改后使用。
 \end{enumerate}
-
-\vspace{1em}
-\noindent\textbf{声明}：本团队对论文中所有内容的真实性、准确性和原创性负责。AI工具的使用仅限于辅助建模思路讨论、代码实现、实验组织与排版修订；核心模型构建、公式推导、求解策略设计与论文定稿均由团队成员独立完成。
 
 \end{document}
