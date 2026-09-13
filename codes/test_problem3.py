@@ -885,7 +885,6 @@ class InformationGainTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Problem3Config(information_gain_scale=value)
 
-
 class UpperBoundShortcutTests(unittest.TestCase):
     """源数上限短路：计数论证的触发条件、可逆性与不污染严格结论。"""
 

@@ -39,12 +39,24 @@ def run_case(scenario, config):
 
 
 def compare_configs(cases=None):
-    """比较周期中断追踪基线与连续处理目标策略，返回逐案例和合计指标。"""
+    """比较分离路线基线、联合后备清除路线和连续追踪消融结果。
+
+    分离路线固定关闭联合路线，保证对照不会随着默认配置漂移；主比较为
+    ``periodic_search`` 与 ``joint_fallback``，``finish_detected`` 仅保留作
+    调度消融。所有结果均来自 OfflineStub，不能解释为正式演练成绩。
+    """
     cases = list(cases or benchmark_cases())
     base = Problem4Config()
     variants = {
-        'periodic_search': replace(base, finish_detected_before_search=False),
-        'finish_detected': replace(base, finish_detected_before_search=True),
+        'periodic_search': replace(base, joint_route_with_clear=False,
+                                   joint_route_with_track=False,
+                                   finish_detected_before_search=False),
+        'joint_fallback': replace(base, joint_route_with_clear=True,
+                                   joint_route_with_track=False,
+                                   finish_detected_before_search=False),
+        'finish_detected': replace(base, joint_route_with_clear=False,
+                                   joint_route_with_track=False,
+                                   finish_detected_before_search=True),
     }
     output = {'cases': len(cases), 'variants': {}}
     for name, config in variants.items():
@@ -59,8 +71,11 @@ def compare_configs(cases=None):
             'results': rows,
         }
     old = output['variants']['periodic_search']['total_virtual_time_s']
-    new = output['variants']['finish_detected']['total_virtual_time_s']
+    new = output['variants']['joint_fallback']['total_virtual_time_s']
     output['virtual_time_reduction'] = None if old == 0 else 1 - new / old
+    old_distance = output['variants']['periodic_search']['total_moved_distance_m']
+    new_distance = output['variants']['joint_fallback']['total_moved_distance_m']
+    output['distance_reduction'] = None if old_distance == 0 else 1 - new_distance / old_distance
     return output
 
 

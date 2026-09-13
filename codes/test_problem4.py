@@ -243,6 +243,35 @@ class StrategyEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Problem4Config(finish_detected_before_search=1)
 
+    def test_joint_route_can_select_fallback_without_extra_measurement(self):
+        """联合路线允许后备清除点与搜索路线合并，且不把普通追踪点提前。"""
+        self.strategy.config = replace(self.strategy.config,
+                                       joint_route_with_clear=True,
+                                       joint_route_with_track=False,
+                                       joint_max_units=0)
+        for channel in self.strategy.channels:
+            self.strategy.channels[channel].status = 'excluded'
+        self.strategy.channels[1].status = 'detected'
+        fallback = StopPlan(np.array([100.0, 0.0]), 'fallback_clear', channel=1)
+        with mock.patch.object(self.strategy, '_tracking_plan', return_value=fallback):
+            selected = self.strategy._joint_plan([1])
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected.kind, 'fallback_clear')
+        self.assertEqual(selected.channel, 1)
+        self.strategy.track_counts[1] = 0
+        tracking = StopPlan(np.array([100.0, 0.0]), 'track', channel=1)
+        with mock.patch.object(self.strategy, '_tracking_plan', return_value=tracking):
+            self.assertIsNone(self.strategy._joint_plan([1]))
+
+    def test_joint_route_flags_validate(self):
+        """联合路线开关和成熟度门槛必须保持显式类型。"""
+        with self.assertRaises(ValueError):
+            Problem4Config(joint_route_with_clear=1)
+        with self.assertRaises(ValueError):
+            Problem4Config(joint_route_with_track=1)
+        with self.assertRaises(ValueError):
+            Problem4Config(joint_max_units=-1)
+
     def test_detected_target_postpones_search_and_search_resumes(self):
         """finish_detected_before_search=True 时目标未清除则连续追踪，清除后仍恢复原覆盖计划。
 

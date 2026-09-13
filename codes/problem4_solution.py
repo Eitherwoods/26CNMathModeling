@@ -61,7 +61,13 @@ class Problem4Config:
     # 只改访问顺序，不改顶点集合，覆盖证书与完成判据不受影响。
     rolling_search_route: bool = True
     rolling_route_min_clears: int = 0
-    search_route_starts: int = 1
+    # 联合开放路的多起点数。联合路线生效后每个停靠都要重排一次
+    # "剩余搜索顶点 ∪ 清除点"，路线质量直接决定行进，多起点 2-opt 明显值得。
+    # 训练 12 种子每源 549.6(1) → 538.2(4) → 531.8(8) → 530.1(16) → 527.5(24)；
+    # **留出 12 种子（13-24）**：633.6(基线) → 588.4(8) / 588.7(16) / 587.5(24)
+    # —— 留出集上 8 以后已无差别，取 8（规划墙钟随 starts 线性增长）。
+    # 留出改善 −7.1%；训练集 −10.3% 里有约 3% 是过拟合。
+    search_route_starts: int = 8
     adaptive_initial_direction: bool = False
     tracking_path_limit_m: float = settings.PROBLEM4_TRACKING_PATH_LIMIT_M
     allocation_by_region: bool = False
@@ -84,12 +90,14 @@ class Problem4Config:
     # 后备清除停靠时可选择性顺带测量已发现频道。
     clear_center_mode: str = 'bbox'
     approach_ring_m: tuple = ()
-    measure_during_fallback: bool = False
+    # 后备清除停靠时顺带测量已发现频道。2026-09-13：联合路线生效后重测（本地
+    # 官方同构 Engine 12 种子每源 549.6 → 543.5 s，−1.1%；高定向局收益最大，
+    # seed5 589.8→564.0、seed8 585.7→570.6，仅 seed1 +0.3%）。原因是 fallback
+    # 停靠点距源很近，一次 6 s 的测量换来的区域收缩能明显缩短格点盲清链。
+    measure_during_fallback: bool = True
     # 自适应追踪轮数：按存活位置单元数缩放有效追踪上限。单元很少的频道
     # 后备链极短（每步约3s+短距移动），不值得再花检测轮；单元很多时多给
     # 轮数可整片收缩区域。0 表示关闭自适应。
-    shared_gain_weight_s: float = 60.0
-    shortlist_radius_factor: float = 1.05
     adaptive_units_low: int = settings.PROBLEM4_ADAPTIVE_UNITS_LOW
     adaptive_units_high: int = settings.PROBLEM4_ADAPTIVE_UNITS_HIGH
     adaptive_extra_rounds: int = settings.PROBLEM4_ADAPTIVE_EXTRA_ROUNDS
@@ -97,11 +105,26 @@ class Problem4Config:
     # 权重越大越愿意为信息增益绕路。shortlist 半径因子控制"接近最优"的容差。
     shared_gain_weight_s: float = 60.0
     shortlist_radius_factor: float = 1.05
+    # 联合路线：把"剩余搜索顶点"与"各已发现频道的下一个动作点"合成一条开放路，
+    # 取路线上第一个点执行，替代"先把搜索顶点走完、再回头逐个清除"的固定次序。
+    # 2026-09-13 诊断：12 源局搜索巡回 18309 m + 清除绕行 9163 m = 27472 m，
+    # 而"顶点 ∪ 源位置"的联合最优开放路只有 ~19500 m —— 分离执行多走 ~7900 m。
+    # 只改访问次序，不改顶点集合与任何完成判据。
+    joint_route_with_clear: bool = settings.PROBLEM4_JOINT_ROUTE_WITH_CLEAR
+    # 联合路线是否把"尚未收缩的追踪点"也并入候选。False = 只并入位置已确定、
+    # 一次动作即可清除的点（实测 certain_clear 在搜索途中几乎不成立，
+    # 该模式等价于基线，留作对照）。
+    joint_route_with_track: bool = settings.PROBLEM4_JOINT_ROUTE_WITH_TRACK
+    # 联合路线的"成熟度门槛"：只把存活单元数不超过此值的频道并入路线。
+    # 区域还很大的频道必须继续靠搜索顶点的顺带测量收缩——过早让它们进入
+    # 追踪/后备链会退化成格点盲清（实测 8 种子：无门槛时 clear 停靠
+    # 34→878、26→268，总时间平均 +17%，seed4 +50%）。0 表示不设门槛。
+    joint_max_units: int = settings.PROBLEM4_JOINT_MAX_UNITS
 
     def __post_init__(self):
         """在任何动作之前拒绝破坏几何保证或调度活性的参数。"""
-        if type(self.search_route_starts) is not int or not 1 <= self.search_route_starts <= 8:
-            raise ValueError('搜索路径初始化次数必须为1到8的整数。')
+        if type(self.search_route_starts) is not int or not 1 <= self.search_route_starts <= 32:
+            raise ValueError('搜索路径初始化次数必须为1到32的整数。')
         if not isinstance(self.lls_probe, bool):
             raise ValueError('lls_probe 必须为布尔值。')
         if not isinstance(self.fallback_center_first, bool):
@@ -161,6 +184,13 @@ class Problem4Config:
                 raise ValueError('自适应追踪阈值必须为非负整数。')
         if not np.isfinite(self.shared_gain_weight_s) or self.shared_gain_weight_s < 0:
             raise ValueError('共享信息增益权重必须非负且有限。')
+        if not isinstance(self.joint_route_with_clear, bool):
+            raise ValueError('joint_route_with_clear 必须为布尔值。')
+        if not isinstance(self.joint_route_with_track, bool):
+            raise ValueError('joint_route_with_track 必须为布尔值。')
+        if (isinstance(self.joint_max_units, bool)
+                or not isinstance(self.joint_max_units, int) or self.joint_max_units < 0):
+            raise ValueError('joint_max_units 必须为非负整数。')
         if not np.isfinite(self.shortlist_radius_factor) or self.shortlist_radius_factor < 1:
             raise ValueError('shortlist 半径因子必须≥1且有限。')
 
@@ -454,6 +484,48 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         route = np.vstack((np.asarray(start, dtype=float), points[order]))
         return float(np.linalg.norm(np.diff(route, axis=0), axis=1).sum())
 
+    def _joint_plan(self, detected):
+        """把剩余搜索顶点与各已发现频道的下一个动作点合成一条开放路。
+
+        只改访问次序：顶点集合不变、覆盖证书不变、每个频道的动作序列不变，
+        因此完成判据与排除证据都不受影响。取路线上第一个点执行，可让机器狗
+        在搜索巡回途中顺路完成清除，而不是把清除全部推迟到搜索结束之后。
+        """
+        targets = []
+        unknown = [c for c, knowledge in self.channels.items() if knowledge.status == 'unknown']
+        if unknown:
+            for index in range(len(self.waypoints)):
+                if any(index not in self.coverage[c] for c in unknown):
+                    targets.append(StopPlan(self.waypoints[index].copy(), 'search',
+                                            search_index=index))
+        for channel in detected:
+            knowledge = self.channels[channel]
+            if (self.config.joint_max_units
+                    and len(knowledge.possible_points()) > self.config.joint_max_units):
+                continue
+            if not self.config.joint_route_with_track:
+                # 只有已到后备阶段或已满足可靠清除的频道才可能减少一次
+                # 额外测量；尚在有限追踪阶段的频道留给原调度器处理。
+                center, _ = knowledge.region_estimate(self.config.clear_center_mode)
+                reliable = (center is not None and knowledge.certain_clear(*center)
+                            and not knowledge.cleared_here(*center))
+                due_fallback = self.track_counts[channel] >= self._tracking_limit_for(knowledge)
+                if not reliable and not due_fallback:
+                    continue
+            plan = self._tracking_plan(channel)
+            # 后备清除不需要追加测量动作，允许它与剩余搜索顶点联合排路；
+            # 普通 ``track`` 点仍需测向，若提前插入会增加动作数并抵消行程收益。
+            if plan is not None and (self.config.joint_route_with_track
+                                     or plan.kind in ('reliable_clear', 'fallback_clear')):
+                targets.append(plan)
+        if not targets:
+            return None
+        if len(targets) == 1:
+            return targets[0]
+        points = np.asarray([t.waypoint for t in targets], dtype=float)
+        order = open_route_order(points, self.position, starts=self.config.search_route_starts)
+        return targets[order[0]]
+
     def _next_channel(self, detected):
         """优先服务行进代价最小的已发现频道，超过公平年龄的频道强制优先。
 
@@ -477,6 +549,9 @@ greedy 模式保持原最近邻选点；tour 模式按预排 Hamilton 路的先�
         detected = self._detected()
         if self.round == 0:
             plan = StopPlan(self.position.copy(), 'initial')
+        elif (self.config.joint_route_with_clear and detected and search is not None
+              and not self.config.finish_detected_before_search):
+            plan = self._joint_plan(detected) or search
         elif (search is not None and
               (not detected or (not self.config.finish_detected_before_search
                                 and self.round % self.config.search_interval == 0))):

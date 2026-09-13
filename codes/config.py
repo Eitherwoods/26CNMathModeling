@@ -101,6 +101,13 @@ PROBLEM4_RING_INNER = (800.0, 6)
 PROBLEM4_RING_MIDDLE = (1600.0, 11)
 PROBLEM4_RING_OUTER = (1900.0, 12)
 PROBLEM4_RING_OFFSET_DEG = 0.0
+# 联合路线：搜索顶点与清除点一起排开放路，避免"先走完搜索再回头清除"的绕行。
+# 12 源局实测分离执行 27472 m，联合最优开放路 ~19500 m（2026-09-13）。
+PROBLEM4_JOINT_ROUTE_WITH_CLEAR = True
+# 未收缩的追踪点需要额外测向；将其提前并入路线会增加动作数，抵消移动收益。
+# 仅把已进入后备清除阶段的频道并入联合路线，保持虚拟时间更低。
+PROBLEM4_JOINT_ROUTE_WITH_TRACK = True
+PROBLEM4_JOINT_MAX_UNITS = 24
 
 # 数值精度
 DISTANCE_TOL = 1e-7
