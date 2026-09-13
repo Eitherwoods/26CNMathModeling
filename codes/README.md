@@ -253,8 +253,8 @@ python -m unittest codes.test_problem4 -v    # 默认跳过 5 项端到端；$en
 python -m codes.problem4_solution "output/Problem4/mission_p4_时间戳.json" --true-total 12
 ```
 
-**动作数远高于问题三，但不构成真实时间风险**：排除证据要求每个频道在全部 37 个搜索
-顶点各做一次无信号检测，因此案例动作数约 640～740（问题三约 250～300）。按上局问题三
+**动作数远高于问题三，但不构成真实时间风险**：旧三角布站需遍历 37 个顶点；当前环形
+布站为 30 个顶点，实际动作数随发现源数约 260～600（问题三约 250～300）。按上局问题三
 真实演练日志实测的单动作墙钟（1343 动作 / 157.4 s ≈ **117 ms/动作**，其中主要是本地
 规划计算），问题四一局约 **75～90 s**，20 分钟真实窗与虚拟预算都远未触及；策略在预算
 不足时仍会安全收尾并标记 `budget_limit`，不会谎报完成。
@@ -316,3 +316,15 @@ python -X utf8 -m codes.run_robot --mode practice --problem 3   --strategy codes
 不实施所有HTTP头、嵌套深度和流量规则；这部分应以附件为准。
 官方会话到期和exit后可能直接关闭接口；桩保留缓存以便单独检查重放逻辑。
 官方演练已多局联调通过；桩的结论仍仅覆盖通信与状态逻辑，不能外推成绩。
+
+### 问题四联合路线优化（2026-09-13）
+
+`Problem4Config.joint_route_with_clear=True` 时，策略将剩余搜索顶点与成熟频道的 `fallback_clear` 候选交给动态开放路线（最近邻 + 2-opt），减少搜索结束后再跨区清除的往返。`joint_route_with_track=False` 保持默认：尚在示向追踪阶段的频道不提前并入，以免增加测量动作；`joint_max_units=24` 控制只有位置外包已充分收缩的频道才参与联合路线。该机制只使用保守外包与已有清除判据，不放宽覆盖证书。
+
+离线配对基准可运行：
+
+```powershell
+python -m codes.benchmark_problem4
+```
+
+输出中的 `periodic_search` 是关闭联合路线的基线，`joint_fallback` 是当前默认路线，`finish_detected` 为调度消融；虚拟时间与移动距离均来自 OfflineStub，不能当作正式演练成绩。留出 Engine 审计记录见 `output/protocol/q4_joint_fallback_holdout_20260913.json`。

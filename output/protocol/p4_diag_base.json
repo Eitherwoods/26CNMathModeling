@@ -1,0 +1,212 @@
+{
+  "overrides": {},
+  "cases": [
+    {
+      "seed": 1,
+      "sources": 12,
+      "directional_sources": 0,
+      "cleared": 12,
+      "excluded_channels": 8,
+      "detected_uncleared": 0,
+      "stop_reason": "all_channels_resolved",
+      "complete": true,
+      "virtual_time_s": 7363.254587,
+      "per_source_s": 613.6045489166667,
+      "moved_m": 27471.272925543366,
+      "actions": 321,
+      "measures": 304,
+      "clears": 17,
+      "switches": 274,
+      "groups": {
+        "search": {
+          "stops": 60,
+          "moved_m": 18308.6202717135,
+          "measures": 302,
+          "clears": 0,
+          "seconds": 5171.7240543427
+        },
+        "track": {
+          "stops": 2,
+          "moved_m": 49.99999999999997,
+          "measures": 2,
+          "clears": 0,
+          "seconds": 19.999999999999993
+        },
+        "clear": {
+          "stops": 34,
+          "moved_m": 9112.652653829866,
+          "measures": 0,
+          "clears": 17,
+          "seconds": 1907.5305307659733
+        },
+        "other": {
+          "stops": 0,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "seconds": 0.0
+        }
+      },
+      "search_stops": 60,
+      "search_measures": 302,
+      "track_stops": 2,
+      "track_measures": 2,
+      "clear_stops": 34
+    },
+    {
+      "seed": 2,
+      "sources": 12,
+      "directional_sources": 0,
+      "cleared": 12,
+      "excluded_channels": 8,
+      "detected_uncleared": 0,
+      "stop_reason": "all_channels_resolved",
+      "complete": true,
+      "virtual_time_s": 7501.392371,
+      "per_source_s": 625.1160309166667,
+      "moved_m": 27676.961847332845,
+      "actions": 335,
+      "measures": 322,
+      "clears": 13,
+      "switches": 293,
+      "groups": {
+        "search": {
+          "stops": 60,
+          "moved_m": 18308.6202717135,
+          "measures": 320,
+          "clears": 0,
+          "seconds": 5261.7240543427
+        },
+        "track": {
+          "stops": 4,
+          "moved_m": 150.00000000000006,
+          "measures": 2,
+          "clears": 0,
+          "seconds": 40.000000000000014
+        },
+        "clear": {
+          "stops": 26,
+          "moved_m": 9218.341575619346,
+          "measures": 0,
+          "clears": 13,
+          "seconds": 1908.6683151238692
+        },
+        "other": {
+          "stops": 0,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "seconds": 0.0
+        }
+      },
+      "search_stops": 60,
+      "search_measures": 320,
+      "track_stops": 4,
+      "track_measures": 2,
+      "clear_stops": 26
+    },
+    {
+      "seed": 3,
+      "sources": 15,
+      "directional_sources": 0,
+      "cleared": 15,
+      "excluded_channels": 5,
+      "detected_uncleared": 0,
+      "stop_reason": "all_channels_resolved",
+      "complete": true,
+      "virtual_time_s": 7206.508796,
+      "per_source_s": 480.4339197333333,
+      "moved_m": 27657.543963500993,
+      "actions": 287,
+      "measures": 271,
+      "clears": 16,
+      "switches": 242,
+      "groups": {
+        "search": {
+          "stops": 60,
+          "moved_m": 18308.6202717135,
+          "measures": 271,
+          "clears": 0,
+          "seconds": 5016.7240543427
+        },
+        "track": {
+          "stops": 0,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "seconds": 0.0
+        },
+        "clear": {
+          "stops": 32,
+          "moved_m": 9348.923691787495,
+          "measures": 0,
+          "clears": 16,
+          "seconds": 1949.784738357499
+        },
+        "other": {
+          "stops": 0,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "seconds": 0.0
+        }
+      },
+      "search_stops": 60,
+      "search_measures": 271,
+      "track_stops": 0,
+      "track_measures": 0,
+      "clear_stops": 32
+    }
+  ],
+  "summary": {
+    "cases": 3,
+    "complete": 3,
+    "mean_sources": 13.0,
+    "mean_virtual_s": 7357.051918,
+    "mean_per_source_s": 573.0514998555556,
+    "mean_moved_m": 27601.926245459068,
+    "mean_measures": 299.0,
+    "mean_clears": 15.333333333333334,
+    "mean_switches": 269.6666666666667,
+    "mean_search_stops": 60.0,
+    "mean_search_measures": 297.6666666666667,
+    "mean_track_stops": 2.0,
+    "mean_track_measures": 1.3333333333333333,
+    "mean_clear_stops": 30.666666666666668,
+    "mean_excluded": 7.0,
+    "groups": {
+      "search": {
+        "stops": 60.0,
+        "moved_m": 18308.6202717135,
+        "measures": 297.6666666666667,
+        "clears": 0.0,
+        "seconds": 5150.057387676033,
+        "share": 0.7261731088336577
+      },
+      "track": {
+        "stops": 2.0,
+        "moved_m": 66.66666666666667,
+        "measures": 1.3333333333333333,
+        "clears": 0.0,
+        "seconds": 20.000000000000004,
+        "share": 0.0028200583184621324
+      },
+      "clear": {
+        "stops": 30.666666666666668,
+        "moved_m": 9226.639307078904,
+        "measures": 0.0,
+        "clears": 15.333333333333334,
+        "seconds": 1921.994528082447,
+        "share": 0.27100683284788024
+      },
+      "other": {
+        "stops": 0.0,
+        "moved_m": 0.0,
+        "measures": 0.0,
+        "clears": 0.0,
+        "seconds": 0.0,
+        "share": 0.0
+      }
+    }
+  }
+}

@@ -1,0 +1,1550 @@
+{
+  "overrides": {},
+  "cases": [
+    {
+      "seed": 1,
+      "sources": 12,
+      "directional_sources": 0,
+      "cleared": 12,
+      "excluded_channels": 8,
+      "detected_uncleared": 0,
+      "stop_reason": "all_channels_resolved",
+      "complete": true,
+      "virtual_time_s": 7363.254587,
+      "per_source_s": 613.6045489166667,
+      "moved_m": 27471.272925543366,
+      "actions": 321,
+      "measures": 304,
+      "clears": 17,
+      "switches": 274,
+      "groups": {
+        "search": {
+          "stops": 60,
+          "moved_m": 18308.6202717135,
+          "measures": 302,
+          "clears": 0,
+          "seconds": 5171.7240543427
+        },
+        "track": {
+          "stops": 2,
+          "moved_m": 49.99999999999997,
+          "measures": 2,
+          "clears": 0,
+          "seconds": 19.999999999999993
+        },
+        "clear": {
+          "stops": 34,
+          "moved_m": 9112.652653829866,
+          "measures": 0,
+          "clears": 17,
+          "seconds": 1907.5305307659733
+        },
+        "other": {
+          "stops": 0,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "seconds": 0.0
+        }
+      },
+      "search_stops": 60,
+      "search_measures": 302,
+      "segments": [
+        {
+          "kind": "initial",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 20,
+          "clears": 0,
+          "from": [
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "initial",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            0.0,
+            0.0
+          ],
+          "to": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 800.0,
+          "measures": 14,
+          "clears": 0,
+          "from": [
+            0.0,
+            0.0
+          ],
+          "to": [
+            800.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            800.0,
+            0.0
+          ],
+          "to": [
+            800.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 799.9999999999999,
+          "measures": 13,
+          "clears": 0,
+          "from": [
+            800.0,
+            0.0
+          ],
+          "to": [
+            400.0000000000001,
+            692.8203230275509
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            400.0000000000001,
+            692.8203230275509
+          ],
+          "to": [
+            400.0000000000001,
+            692.8203230275509
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 800.0,
+          "measures": 16,
+          "clears": 0,
+          "from": [
+            400.0000000000001,
+            692.8203230275509
+          ],
+          "to": [
+            -399.99999999999983,
+            692.820323027551
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -399.99999999999983,
+            692.820323027551
+          ],
+          "to": [
+            -399.99999999999983,
+            692.820323027551
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 800.0000000000001,
+          "measures": 13,
+          "clears": 0,
+          "from": [
+            -399.99999999999983,
+            692.820323027551
+          ],
+          "to": [
+            -800.0,
+            9.797174393178826e-14
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -800.0,
+            9.797174393178826e-14
+          ],
+          "to": [
+            -800.0,
+            9.797174393178826e-14
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 799.9999999999999,
+          "measures": 12,
+          "clears": 0,
+          "from": [
+            -800.0,
+            9.797174393178826e-14
+          ],
+          "to": [
+            -400.00000000000034,
+            -692.8203230275508
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -400.00000000000034,
+            -692.8203230275508
+          ],
+          "to": [
+            -400.00000000000034,
+            -692.8203230275508
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 800.0000000000005,
+          "measures": 11,
+          "clears": 0,
+          "from": [
+            -400.00000000000034,
+            -692.8203230275508
+          ],
+          "to": [
+            400.0000000000001,
+            -692.8203230275509
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            400.0000000000001,
+            -692.8203230275509
+          ],
+          "to": [
+            400.0000000000001,
+            -692.8203230275509
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 807.2124120780746,
+          "measures": 10,
+          "clears": 0,
+          "from": [
+            400.0000000000001,
+            -692.8203230275509
+          ],
+          "to": [
+            664.664020803019,
+            -1455.4111925672291
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            664.664020803019,
+            -1455.4111925672291
+          ],
+          "to": [
+            664.664020803019,
+            -1455.4111925672291
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 342.8275233344683,
+          "measures": 10,
+          "clears": 0,
+          "from": [
+            664.664020803019,
+            -1455.4111925672291
+          ],
+          "to": [
+            950.0000000000002,
+            -1645.4482671904334
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            950.0000000000002,
+            -1645.4482671904334
+          ],
+          "to": [
+            950.0000000000002,
+            -1645.4482671904334
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 875.1459719258627,
+          "measures": 10,
+          "clears": 0,
+          "from": [
+            950.0000000000002,
+            -1645.4482671904334
+          ],
+          "to": [
+            1346.0056525298892,
+            -865.0253079289572
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1346.0056525298892,
+            -865.0253079289572
+          ],
+          "to": [
+            1346.0056525298892,
+            -865.0253079289572
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 311.26608836702974,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            1346.0056525298892,
+            -865.0253079289572
+          ],
+          "to": [
+            1645.448267190433,
+            -950.0000000000008
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1645.448267190433,
+            -950.0000000000008
+          ],
+          "to": [
+            1645.448267190433,
+            -950.0000000000008
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 951.0865076272581,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            1645.448267190433,
+            -950.0000000000008
+          ],
+          "to": [
+            1600.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1600.0,
+            0.0
+          ],
+          "to": [
+            1600.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 300.0,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            1600.0,
+            0.0
+          ],
+          "to": [
+            1900.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1900.0,
+            0.0
+          ],
+          "to": [
+            1900.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 983.5123713895788,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            1900.0,
+            0.0
+          ],
+          "to": [
+            1645.4482671904336,
+            949.9999999999999
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1645.4482671904336,
+            949.9999999999999
+          ],
+          "to": [
+            1645.4482671904336,
+            949.9999999999999
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 311.26608836702985,
+          "measures": 10,
+          "clears": 0,
+          "from": [
+            1645.4482671904336,
+            949.9999999999999
+          ],
+          "to": [
+            1346.0056525298899,
+            865.0253079289561
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1346.0056525298899,
+            865.0253079289561
+          ],
+          "to": [
+            1346.0056525298899,
+            865.0253079289561
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 875.145971925864,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            1346.0056525298899,
+            865.0253079289561
+          ],
+          "to": [
+            950.0000000000002,
+            1645.4482671904334
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            950.0000000000002,
+            1645.4482671904334
+          ],
+          "to": [
+            950.0000000000002,
+            1645.4482671904334
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 342.82752333446876,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            950.0000000000002,
+            1645.4482671904334
+          ],
+          "to": [
+            664.6640208030183,
+            1455.4111925672294
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            664.6640208030183,
+            1455.4111925672294
+          ],
+          "to": [
+            664.6640208030183,
+            1455.4111925672294
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 799.6483403625172,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            664.6640208030183,
+            1455.4111925672294
+          ],
+          "to": [
+            1.1634144591899854e-13,
+            1900.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1.1634144591899854e-13,
+            1900.0
+          ],
+          "to": [
+            1.1634144591899854e-13,
+            1900.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 389.7250740764945,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            1.1634144591899854e-13,
+            1900.0
+          ],
+          "to": [
+            -227.70374123725637,
+            1583.7143070094924
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -227.70374123725637,
+            1583.7143070094924
+          ],
+          "to": [
+            -227.70374123725637,
+            1583.7143070094924
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 724.9296291794657,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -227.70374123725637,
+            1583.7143070094924
+          ],
+          "to": [
+            -949.9999999999995,
+            1645.4482671904336
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -949.9999999999995,
+            1645.4482671904336
+          ],
+          "to": [
+            -949.9999999999995,
+            1645.4482671904336
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 447.07216491607204,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -949.9999999999995,
+            1645.4482671904336
+          ],
+          "to": [
+            -1047.777174312456,
+            1209.1993189668133
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1047.777174312456,
+            1209.1993189668133
+          ],
+          "to": [
+            -1047.777174312456,
+            1209.1993189668133
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 651.4560785001671,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -1047.777174312456,
+            1209.1993189668133
+          ],
+          "to": [
+            -1645.4482671904336,
+            949.9999999999999
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1645.4482671904336,
+            949.9999999999999
+          ],
+          "to": [
+            -1645.4482671904336,
+            949.9999999999999
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 511.2589017248169,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -1645.4482671904336,
+            949.9999999999999
+          ],
+          "to": [
+            -1535.1887577831956,
+            450.7720909462881
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1535.1887577831956,
+            450.7720909462881
+          ],
+          "to": [
+            -1535.1887577831956,
+            450.7720909462881
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 579.8988881036558,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            -1535.1887577831956,
+            450.7720909462881
+          ],
+          "to": [
+            -1900.0,
+            2.326828918379971e-13
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1900.0,
+            2.326828918379971e-13
+          ],
+          "to": [
+            -1900.0,
+            2.326828918379971e-13
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 579.8988881036557,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            -1900.0,
+            2.326828918379971e-13
+          ],
+          "to": [
+            -1535.1887577831958,
+            -450.77209094628773
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1535.1887577831958,
+            -450.77209094628773
+          ],
+          "to": [
+            -1535.1887577831958,
+            -450.77209094628773
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 511.25890172481746,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -1535.1887577831958,
+            -450.77209094628773
+          ],
+          "to": [
+            -1645.4482671904334,
+            -950.0000000000002
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1645.4482671904334,
+            -950.0000000000002
+          ],
+          "to": [
+            -1645.4482671904334,
+            -950.0000000000002
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 651.4560785001665,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -1645.4482671904334,
+            -950.0000000000002
+          ],
+          "to": [
+            -1047.7771743124563,
+            -1209.199318966813
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -1047.7771743124563,
+            -1209.199318966813
+          ],
+          "to": [
+            -1047.7771743124563,
+            -1209.199318966813
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 447.0721649160716,
+          "measures": 8,
+          "clears": 0,
+          "from": [
+            -1047.7771743124563,
+            -1209.199318966813
+          ],
+          "to": [
+            -950.0000000000008,
+            -1645.4482671904332
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -950.0000000000008,
+            -1645.4482671904332
+          ],
+          "to": [
+            -950.0000000000008,
+            -1645.4482671904332
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 724.9296291794669,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            -950.0000000000008,
+            -1645.4482671904332
+          ],
+          "to": [
+            -227.70374123725637,
+            -1583.7143070094924
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -227.70374123725637,
+            -1583.7143070094924
+          ],
+          "to": [
+            -227.70374123725637,
+            -1583.7143070094924
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 389.7250740764942,
+          "measures": 9,
+          "clears": 0,
+          "from": [
+            -227.70374123725637,
+            -1583.7143070094924
+          ],
+          "to": [
+            -3.4902433775699563e-13,
+            -1900.0
+          ]
+        },
+        {
+          "kind": "search",
+          "channel": null,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -3.4902433775699563e-13,
+            -1900.0
+          ],
+          "to": [
+            -3.4902433775699563e-13,
+            -1900.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 2,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -3.4902433775699563e-13,
+            -1900.0
+          ],
+          "to": [
+            -3.4902433775699563e-13,
+            -1900.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 2,
+          "moved_m": 360.55512754639875,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -3.4902433775699563e-13,
+            -1900.0
+          ],
+          "to": [
+            -200.0,
+            -1600.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 3,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -200.0,
+            -1600.0
+          ],
+          "to": [
+            -200.0,
+            -1600.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 3,
+          "moved_m": 1365.283853270081,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -200.0,
+            -1600.0
+          ],
+          "to": [
+            960.0,
+            -880.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 3,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            960.0,
+            -880.0
+          ],
+          "to": [
+            960.0,
+            -880.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 3,
+          "moved_m": 20.0,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            960.0,
+            -880.0
+          ],
+          "to": [
+            980.0,
+            -880.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 3,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            980.0,
+            -880.0
+          ],
+          "to": [
+            980.0,
+            -880.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 3,
+          "moved_m": 20.0,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            980.0,
+            -880.0
+          ],
+          "to": [
+            980.0,
+            -860.0
+          ]
+        },
+        {
+          "kind": "track",
+          "channel": 9,
+          "moved_m": 49.99999999999997,
+          "measures": 2,
+          "clears": 0,
+          "from": [
+            980.0,
+            -860.0
+          ],
+          "to": [
+            999.4028500029067,
+            -813.9182312430968
+          ]
+        },
+        {
+          "kind": "track",
+          "channel": 9,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            999.4028500029067,
+            -813.9182312430968
+          ],
+          "to": [
+            999.4028500029067,
+            -813.9182312430968
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 9,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            999.4028500029067,
+            -813.9182312430968
+          ],
+          "to": [
+            999.4028500029067,
+            -813.9182312430968
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 9,
+          "moved_m": 974.8520208145407,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            999.4028500029067,
+            -813.9182312430968
+          ],
+          "to": [
+            1740.0,
+            -180.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 9,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1740.0,
+            -180.0
+          ],
+          "to": [
+            1740.0,
+            -180.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 9,
+          "moved_m": 20.0,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            1740.0,
+            -180.0
+          ],
+          "to": [
+            1760.0,
+            -180.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 4,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            1760.0,
+            -180.0
+          ],
+          "to": [
+            1760.0,
+            -180.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 4,
+          "moved_m": 835.7032966310471,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            1760.0,
+            -180.0
+          ],
+          "to": [
+            980.0,
+            120.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 12,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            980.0,
+            120.0
+          ],
+          "to": [
+            980.0,
+            120.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 12,
+          "moved_m": 970.9788875150684,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            980.0,
+            120.0
+          ],
+          "to": [
+            460.0,
+            940.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 19,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            460.0,
+            940.0
+          ],
+          "to": [
+            460.0,
+            940.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 19,
+          "moved_m": 808.9499366462674,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            460.0,
+            940.0
+          ],
+          "to": [
+            340.0,
+            1740.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 19,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            340.0,
+            1740.0
+          ],
+          "to": [
+            340.0,
+            1740.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 19,
+          "moved_m": 20.0,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            340.0,
+            1740.0
+          ],
+          "to": [
+            340.0,
+            1760.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 11,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            340.0,
+            1760.0
+          ],
+          "to": [
+            340.0,
+            1760.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 11,
+          "moved_m": 1162.7553482998906,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            340.0,
+            1760.0
+          ],
+          "to": [
+            -180.0,
+            720.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 8,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -180.0,
+            720.0
+          ],
+          "to": [
+            -180.0,
+            720.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 8,
+          "moved_m": 384.1874542459709,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -180.0,
+            720.0
+          ],
+          "to": [
+            -480.0,
+            480.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 7,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -480.0,
+            480.0
+          ],
+          "to": [
+            -480.0,
+            480.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 7,
+          "moved_m": 268.32815729997475,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -480.0,
+            480.0
+          ],
+          "to": [
+            -600.0,
+            240.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 14,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -600.0,
+            240.0
+          ],
+          "to": [
+            -600.0,
+            240.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 14,
+          "moved_m": 316.22776601683796,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -600.0,
+            240.0
+          ],
+          "to": [
+            -900.0,
+            340.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 14,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -900.0,
+            340.0
+          ],
+          "to": [
+            -900.0,
+            340.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 14,
+          "moved_m": 20.0,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -900.0,
+            340.0
+          ],
+          "to": [
+            -920.0,
+            340.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 13,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -920.0,
+            340.0
+          ],
+          "to": [
+            -920.0,
+            340.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 13,
+          "moved_m": 900.0,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -920.0,
+            340.0
+          ],
+          "to": [
+            -920.0,
+            -560.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 1,
+          "moved_m": 0.0,
+          "measures": 0,
+          "clears": 0,
+          "from": [
+            -920.0,
+            -560.0
+          ],
+          "to": [
+            -920.0,
+            -560.0
+          ]
+        },
+        {
+          "kind": "fallback_clear",
+          "channel": 1,
+          "moved_m": 664.8308055437865,
+          "measures": 0,
+          "clears": 1,
+          "from": [
+            -920.0,
+            -560.0
+          ],
+          "to": [
+            -1560.0,
+            -740.0
+          ]
+        }
+      ],
+      "track_stops": 2,
+      "track_measures": 2,
+      "clear_stops": 34
+    }
+  ],
+  "summary": {
+    "cases": 1,
+    "complete": 1,
+    "mean_sources": 12.0,
+    "mean_virtual_s": 7363.254587,
+    "mean_per_source_s": 613.6045489166667,
+    "mean_moved_m": 27471.272925543366,
+    "mean_measures": 304.0,
+    "mean_clears": 17.0,
+    "mean_switches": 274.0,
+    "mean_search_stops": 60.0,
+    "mean_search_measures": 302.0,
+    "mean_track_stops": 2.0,
+    "mean_track_measures": 2.0,
+    "mean_clear_stops": 34.0,
+    "mean_excluded": 8.0,
+    "groups": {
+      "search": {
+        "stops": 60.0,
+        "moved_m": 18308.6202717135,
+        "measures": 302.0,
+        "clears": 0.0,
+        "seconds": 5171.7240543427,
+        "share": 0.7284883211810516
+      },
+      "track": {
+        "stops": 2.0,
+        "moved_m": 49.99999999999997,
+        "measures": 2.0,
+        "clears": 0.0,
+        "seconds": 19.999999999999993,
+        "share": 0.002817197180384515
+      },
+      "clear": {
+        "stops": 34.0,
+        "moved_m": 9112.652653829866,
+        "measures": 0.0,
+        "clears": 17.0,
+        "seconds": 1907.5305307659733,
+        "share": 0.26869448163856396
+      },
+      "other": {
+        "stops": 0.0,
+        "moved_m": 0.0,
+        "measures": 0.0,
+        "clears": 0.0,
+        "seconds": 0.0,
+        "share": 0.0
+      }
+    }
+  }
+}
