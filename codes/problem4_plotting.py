@@ -37,8 +37,8 @@ def plot_mission(record, scenario=None, figures_dir=PROBLEM4_FIG_DIR, name=None)
 
     _plot_trajectory(axes[0], record, scenario)
     _plot_evidence(axes[1], record)
-    _plot_convergence(axes[2], record)
-    _plot_timeline(axes[3], record)
+    _plot_convergence(axes[2], record, panel='(c)')
+    _plot_timeline(axes[3], record, panel='(d)')
 
     for extension in ('png', 'svg'):
         fig.savefig(figures_dir / f'{name}.{extension}', dpi=DPI)
